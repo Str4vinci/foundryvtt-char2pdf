@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+
+output/
+output_*/
+
+DnD_2024_Character-Sheet.pdf
+fvtt-Actor-*.json
+visualguide.md
+
+.claude/
+.codex
+
+.DS_Store
