@@ -41,9 +41,9 @@ Every generated HTML sheet also includes an in-browser theme toggle that cycles 
 
 - Python `3.10+`. Older Python versions are not supported because the generator uses modern type-hint syntax.
 - No third-party Python packages; the generator uses only the Python standard library
-- A Chromium-family browser for PDF export: `chromium`, `chromium-browser`, `google-chrome`, or `google-chrome-stable`
+- A Chromium-compatible browser for PDF export: Chromium, Google Chrome, or Microsoft Edge
 
-HTML generation works with vanilla Python alone. PDF generation additionally requires a local Chromium-compatible browser. If autodetection does not find your browser, pass it explicitly with `--chromium /path/to/browser`. CI checks the minimum supported Python version, currently Python 3.10.
+HTML generation works with vanilla Python alone. PDF generation additionally requires a local Chromium-compatible browser. The generator looks for common Linux commands plus standard macOS and Windows Chrome/Edge install paths. If autodetection does not find your browser, pass it explicitly with `--print-browser /path/to/browser` or the legacy `--chromium /path/to/browser`. CI checks the minimum supported Python version, currently Python 3.10.
 
 ## Usage
 
@@ -93,6 +93,12 @@ Render every registered theme in one run:
 
 ```bash
 python3 generate_character_sheet.py path/to/actor.json --all-themes
+```
+
+Use a specific browser for PDF export:
+
+```bash
+python3 generate_character_sheet.py path/to/actor.json --pdf --print-browser /path/to/browser
 ```
 
 Outputs are written to `output/` (override with `--output-dir`).

@@ -4949,6 +4949,14 @@ def write_output(
 def chromium_path(explicit: str | None) -> str | None:
     if explicit:
         return explicit
+    return detect_print_browser()
+
+
+def detect_print_browser(
+    which: Any = shutil.which,
+    exists: Any | None = None,
+) -> str | None:
+    exists = exists or (lambda path: path.exists())
     for candidate in (
         "chromium",
         "chromium-browser",
@@ -4958,7 +4966,7 @@ def chromium_path(explicit: str | None) -> str | None:
         "msedge",
         "microsoft-edge",
     ):
-        found = shutil.which(candidate)
+        found = which(candidate)
         if found:
             return found
     platform_paths = [
@@ -4971,7 +4979,7 @@ def chromium_path(explicit: str | None) -> str | None:
         Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
     ]
     for candidate in platform_paths:
-        if candidate.exists():
+        if exists(candidate):
             return str(candidate)
     return None
 
@@ -5023,6 +5031,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--all-themes", action="store_true", help="Render one HTML per registered theme")
     parser.add_argument("--pdf", action="store_true", help="Also generate a PDF using local Chromium")
     parser.add_argument("--chromium", help="Explicit Chromium executable path")
+    parser.add_argument("--print-browser", dest="chromium", help="Explicit Chromium-compatible browser path for PDF export")
     parser.add_argument("--no-footer", action="store_true", help="Do not include the attribution/disclaimer footer")
     parser.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
     return parser.parse_args()
