@@ -101,6 +101,20 @@ class GenerationSmokeTests(unittest.TestCase):
                 self.assertIn("<!doctype html>", html)
                 self.assertIn('data-theme", initial', html)
 
+    def test_print_browser_detection_prefers_path_lookup(self) -> None:
+        def fake_which(name: str) -> str | None:
+            return "/usr/bin/google-chrome" if name == "google-chrome" else None
+
+        self.assertEqual(sheet.detect_print_browser(which=fake_which), "/usr/bin/google-chrome")
+
+    def test_print_browser_detection_falls_back_to_platform_paths(self) -> None:
+        wanted = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+
+        def fake_exists(path: Path) -> bool:
+            return path == wanted
+
+        self.assertEqual(sheet.detect_print_browser(which=lambda _: None, exists=fake_exists), str(wanted))
+
 
 if __name__ == "__main__":
     unittest.main()
