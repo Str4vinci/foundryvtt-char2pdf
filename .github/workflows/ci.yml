@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Python checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+
+      - name: Compile Python files
+        run: python -m py_compile generate_character_sheet.py
+
+      - name: Run unit tests
+        run: |
+          if find tests -name 'test*.py' -print -quit 2>/dev/null | grep -q .; then
+            python -m unittest discover -s tests
+          else
+            echo "No test files yet; skipping unit tests."
+          fi
