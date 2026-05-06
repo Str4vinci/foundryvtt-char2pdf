@@ -1538,6 +1538,7 @@ def render_sheet_v2(data: dict[str, Any], sheet_id: str, backgrounds: tuple[str,
             data["notes"]["biography"],
         ] if section
     )
+    equipment_text = "\n".join(f"{item['quantity']}x {item['name']}" for item in data["inventory"])
 
     top_refs = []
     for key in ["background", "class", "subclass", "species"]:
@@ -1624,7 +1625,7 @@ def render_sheet_v2(data: dict[str, Any], sheet_id: str, backgrounds: tuple[str,
       {render_v2_field(data["notes"]["appearance"], "v2-appearance", "appearance-box", multiline=True)}
       {render_v2_field(backstory_text, "v2-backstory", "backstory-box", multiline=True)}
       {render_v2_field(", ".join(data["languages"]), "v2-languages", "languages-box", multiline=True)}
-      {render_v2_field("\n".join(f"{item['quantity']}x {item['name']}" for item in data["inventory"]), "v2-equipment", "equipment-box", multiline=True)}
+      {render_v2_field(equipment_text, "v2-equipment", "equipment-box", multiline=True)}
 
       <section class="coin-box">{coin_inputs}</section>
     </section>

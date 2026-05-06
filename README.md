@@ -39,11 +39,11 @@ Every generated HTML sheet also includes an in-browser theme toggle that cycles 
 
 ## Requirements
 
-- Python `3.10+`
+- Python `3.10+`. Older Python versions are not supported because the generator uses modern type-hint syntax.
 - No third-party Python packages; the generator uses only the Python standard library
 - A Chromium-family browser for PDF export: `chromium`, `chromium-browser`, `google-chrome`, or `google-chrome-stable`
 
-HTML generation works with vanilla Python alone. PDF generation additionally requires a local Chromium-compatible browser. If autodetection does not find your browser, pass it explicitly with `--chromium /path/to/browser`.
+HTML generation works with vanilla Python alone. PDF generation additionally requires a local Chromium-compatible browser. If autodetection does not find your browser, pass it explicitly with `--chromium /path/to/browser`. CI checks the minimum supported Python version, currently Python 3.10.
 
 ## Usage
 

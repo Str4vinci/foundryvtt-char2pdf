@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -5,14 +6,64 @@ from pathlib import Path
 import generate_character_sheet as sheet
 
 
-ROOT = Path(__file__).resolve().parents[1]
-ACTOR = ROOT / "fvtt-Actor-xano-miJSPjh0oyGzrgSD.json"
+MINIMAL_ACTOR = {
+    "name": "CI Cleric",
+    "type": "character",
+    "system": {
+        "abilities": {
+            "str": {"value": 10},
+            "dex": {"value": 14},
+            "con": {"value": 12},
+            "int": {"value": 10},
+            "wis": {"value": 16},
+            "cha": {"value": 8},
+        },
+        "attributes": {
+            "ac": {"value": 13},
+            "hp": {"value": 20, "max": 20, "temp": 0},
+            "init": {"bonus": 0},
+            "inspiration": False,
+        },
+        "details": {
+            "xp": {"value": 900},
+            "trait": "Curious",
+            "ideal": "",
+            "bond": "",
+            "flaw": "",
+            "biography": {"value": ""},
+        },
+        "skills": {},
+        "tools": {},
+        "traits": {
+            "size": "med",
+            "armorProf": {"value": ["lgt", "med", "shl"]},
+            "weaponProf": {"value": ["sim"]},
+            "languages": {"value": ["common"]},
+        },
+        "spells": {"spell1": {"max": 2, "value": 2}},
+        "currency": {"gp": 5},
+    },
+    "items": [
+        {"name": "Cleric", "type": "class", "system": {"levels": 3, "hd": {"denomination": "d8", "spent": 0}}},
+        {"name": "Acolyte", "type": "background", "system": {}},
+        {"name": "Human", "type": "race", "system": {"movement": {"walk": 30}, "senses": {"ranges": {}}}},
+        {"name": "Mace", "type": "weapon", "system": {"equipped": True, "damage": {"base": {"number": 1, "denomination": 6, "types": ["bludgeoning"]}}, "range": {"value": 5, "units": "ft"}}},
+        {"name": "Bless", "type": "spell", "system": {"level": 1, "preparation": {"mode": "prepared", "prepared": True}, "activities": {}, "properties": []}},
+    ],
+}
+
+
+def write_actor(directory: Path) -> Path:
+    actor_path = directory / "minimal-actor.json"
+    actor_path.write_text(json.dumps(MINIMAL_ACTOR))
+    return actor_path
 
 
 class GenerationSmokeTests(unittest.TestCase):
     def test_default_sheet_contains_toolbar_footer_and_print_hp_override(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            paths = sheet.write_output(ACTOR, Path(tmp), theme="ledger")
+            tmp_path = Path(tmp)
+            paths = sheet.write_output(write_actor(tmp_path), tmp_path, theme="ledger")
 
             self.assertEqual(len(paths), 1)
             html = paths[0].read_text()
@@ -24,7 +75,8 @@ class GenerationSmokeTests(unittest.TestCase):
 
     def test_footer_can_be_omitted(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            paths = sheet.write_output(ACTOR, Path(tmp), theme="ledger", include_footer=False)
+            tmp_path = Path(tmp)
+            paths = sheet.write_output(write_actor(tmp_path), tmp_path, theme="ledger", include_footer=False)
 
             html = paths[0].read_text()
             self.assertNotIn('class="sheet-footer"', html)
@@ -32,7 +84,8 @@ class GenerationSmokeTests(unittest.TestCase):
 
     def test_all_themes_render_html_without_pdf(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            paths = sheet.write_output(ACTOR, Path(tmp), all_themes=True, mode="mono")
+            tmp_path = Path(tmp)
+            paths = sheet.write_output(write_actor(tmp_path), tmp_path, all_themes=True, mode="mono")
 
             self.assertEqual(len(paths), len(sheet.THEMES))
             for path in paths:
