@@ -3731,6 +3731,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       border-radius: calc(var(--radius) - 6px);
       background: rgba(255,255,255,0.22);
       padding: 10px;
+      box-shadow: inset 3px 0 0 var(--accent);
     }
     .ability-heading {
       display: flex;
@@ -3740,8 +3741,17 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       margin-bottom: 8px;
     }
     .ability-code {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.5rem;
+      min-height: 1.8rem;
+      padding: 0 0.28rem;
+      border: 1px solid var(--accent);
+      background: rgba(255,255,255,0.22);
       font-family: var(--display);
-      font-size: 0.96rem;
+      font-size: 1.04rem;
+      line-height: 1;
       color: var(--accent);
     }
     .ability-name {
@@ -3753,7 +3763,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
     }
     .ability-core {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
       gap: 12px;
       padding-bottom: 8px;
@@ -3767,6 +3777,13 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       color: var(--accent);
     }
     .ability-score {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 3.4rem;
+      min-height: 1.8rem;
+      border: 1px solid var(--rule-soft);
+      background: rgba(255,255,255,0.16);
       font-family: var(--mono);
       font-size: 0.86rem;
       color: var(--ink-soft);
@@ -4274,6 +4291,16 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
         gap: 8px;
         padding-bottom: 6px;
         margin-bottom: 6px;
+      }
+      .ability-code {
+        min-width: 2rem;
+        min-height: 1.35rem;
+        font-size: 0.78rem;
+      }
+      .ability-score {
+        min-width: 2.8rem;
+        min-height: 1.35rem;
+        font-size: 0.62rem;
       }
       .ability-skill-group {
         margin-top: 6px;
