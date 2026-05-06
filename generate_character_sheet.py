@@ -2026,6 +2026,10 @@ def render_sheet_v2(data: dict[str, Any], sheet_id: str, backgrounds: tuple[str,
 
 BASE_LAYOUTS = ("ledger", "gazette", "grimoire")
 MODE_CHOICES = ("light", "dark", "mono")
+PAPER_PROFILES = {
+    "a4": "size: A4; margin: 9mm;",
+    "letter": "size: Letter; margin: 0.35in;",
+}
 
 CLASS_THEME_COLORS = {
     "artificer": "#6E7B85",
@@ -4846,6 +4850,7 @@ def render_character_sheet(
     theme_palette: dict[str, str] | None = None,
     palette_decoration: str | None = None,
     include_footer: bool = True,
+    paper: str = "a4",
 ) -> str:
     html = render_dnd_layout_template(data, sheet_id, style=style, palette=palette_decoration)
     html = html.replace(
@@ -4857,6 +4862,7 @@ def render_character_sheet(
     html = html.replace("reset-dnd-layout", "reset-sheet")
     html = html.replace("dnd-layout-", "sheet-")
     html = html.replace("dnd-layout", "sheet")
+    html = html.replace("@page { size: A4; margin: 9mm; }", f"@page {{ {PAPER_PROFILES[paper]} }}")
 
     overrides = _sheet_mode_overrides(style, theme_palette=theme_palette)
     html = html.replace("</style>", overrides + "</style>", 1)
@@ -4891,6 +4897,7 @@ def _render_one_theme(
     entry: dict,
     mode: str | None,
     include_footer: bool = True,
+    paper: str = "a4",
 ) -> Path:
     html_path = output_dir / f"{sheet_id}-character-sheet-{theme_label.lstrip('#')}.html"
     palette = {
@@ -4907,6 +4914,7 @@ def _render_one_theme(
         theme_palette=palette,
         palette_decoration=entry.get("decoration"),
         include_footer=include_footer,
+        paper=paper,
     ))
     return html_path
 
@@ -4918,6 +4926,7 @@ def write_output(
     theme: str | None = None,
     all_themes: bool = False,
     include_footer: bool = True,
+    paper: str = "a4",
 ) -> list[Path]:
     actor = json.loads(actor_path.read_text())
     context = sheet_context(actor)
@@ -4925,7 +4934,7 @@ def write_output(
 
     if all_themes:
         return [
-            _render_one_theme(context, sheet_id, output_dir, name, dict(entry), mode, include_footer=include_footer)
+            _render_one_theme(context, sheet_id, output_dir, name, dict(entry), mode, include_footer=include_footer, paper=paper)
             for name, entry in THEMES.items()
         ]
 
@@ -4934,7 +4943,7 @@ def write_output(
         # No actor class detected and no --theme passed → fall back to ledger
         resolved = ("ledger", dict(THEMES["ledger"]))
     label, entry = resolved
-    return [_render_one_theme(context, sheet_id, output_dir, label, entry, mode, include_footer=include_footer)]
+    return [_render_one_theme(context, sheet_id, output_dir, label, entry, mode, include_footer=include_footer, paper=paper)]
 
 
 def chromium_path(explicit: str | None) -> str | None:
@@ -5001,6 +5010,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("actor_json", type=Path, help="Path to the exported Foundry actor JSON file")
     parser.add_argument("--output-dir", type=Path, default=Path("output"), help="Where to write generated files")
     parser.add_argument("--mode", choices=list(MODE_CHOICES), help="Initial color mode for the generated HTML/PDF (light, dark, or mono)")
+    parser.add_argument("--paper", choices=list(PAPER_PROFILES), default="a4", help="Print/PDF paper profile (default: a4)")
     parser.add_argument(
         "--theme",
         type=parse_theme_arg,
@@ -5028,6 +5038,7 @@ def main() -> int:
         theme=args.theme,
         all_themes=args.all_themes,
         include_footer=not args.no_footer,
+        paper=args.paper,
     )
     for path in html_paths:
         print(f"HTML written to {path}")

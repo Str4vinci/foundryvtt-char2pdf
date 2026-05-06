@@ -82,6 +82,14 @@ class GenerationSmokeTests(unittest.TestCase):
             self.assertNotIn('class="sheet-footer"', html)
             self.assertNotIn("Made by Stravinci @ stravinci.pt", html)
 
+    def test_letter_paper_profile_sets_print_page_size(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            paths = sheet.write_output(write_actor(tmp_path), tmp_path, theme="ledger", paper="letter")
+
+            html = paths[0].read_text()
+            self.assertIn("@page { size: Letter; margin: 0.35in; }", html)
+
     def test_all_themes_render_html_without_pdf(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
