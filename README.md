@@ -77,6 +77,12 @@ Generate a pure black-and-white printable PDF:
 python3 generate_character_sheet.py path/to/actor.json --mode mono --pdf
 ```
 
+Omit the generated attribution/disclaimer footer:
+
+```bash
+python3 generate_character_sheet.py path/to/actor.json --no-footer
+```
+
 Render every registered theme in one run:
 
 ```bash
@@ -84,6 +90,14 @@ python3 generate_character_sheet.py path/to/actor.json --all-themes
 ```
 
 Outputs are written to `output/` (override with `--output-dir`).
+
+## Tests
+
+Run the smoke tests with:
+
+```bash
+python3 -m unittest discover -s tests
+```
 
 ## Notes
 

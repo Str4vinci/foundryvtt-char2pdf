@@ -1340,16 +1340,24 @@ def render_tracker_pips(count: int, key_prefix: str, class_name: str = "diamond"
     )
 
 
-def render_v2_field(value: Any, key: str, class_name: str, multiline: bool = False, numeric: bool = False) -> str:
+def render_v2_field(
+    value: Any,
+    key: str,
+    class_name: str,
+    multiline: bool = False,
+    numeric: bool = False,
+    print_value: Any | None = None,
+) -> str:
+    print_attr = "" if print_value is None else f' data-print-value="{esc(print_value)}"'
     if multiline:
-        return f'<textarea class="v2-field {esc(class_name)}" data-persist="{esc(key)}">{esc(value)}</textarea>'
+        return f'<textarea class="v2-field {esc(class_name)}" data-persist="{esc(key)}"{print_attr}>{esc(value)}</textarea>'
     if numeric:
         return (
             f'<input class="v2-field {esc(class_name)}" type="text" inputmode="numeric" '
             f'pattern="[0-9+\\-]*" autocomplete="off" spellcheck="false" '
-            f'data-persist="{esc(key)}" value="{esc(value)}">'
+            f'data-persist="{esc(key)}" value="{esc(value)}"{print_attr}>'
         )
-    return f'<input class="v2-field {esc(class_name)}" type="text" data-persist="{esc(key)}" value="{esc(value)}">'
+    return f'<input class="v2-field {esc(class_name)}" type="text" data-persist="{esc(key)}" value="{esc(value)}"{print_attr}>'
 
 
 def render_v2_list(entries: list[dict[str, Any]], max_items: int = 10) -> str:
@@ -3006,8 +3014,18 @@ def _sheet_theme_css(style: str) -> str:
 
 
 def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str = "ledger", palette: str | None = None) -> str:
-    def field(value: Any, key: str, class_name: str, multiline: bool = False, numeric: bool = False) -> str:
-        return render_v2_field(value, key, class_name, multiline=multiline, numeric=numeric)
+    def field(
+        value: Any,
+        key: str,
+        class_name: str,
+        multiline: bool = False,
+        numeric: bool = False,
+        print_value: Any | None = None,
+    ) -> str:
+        return render_v2_field(value, key, class_name, multiline=multiline, numeric=numeric, print_value=print_value)
+
+    def blank_zero(value: Any) -> Any:
+        return "" if value in (None, "", 0, 0.0, "0") else value
 
     save_map = {row["label"]: row for row in data["saving_throw_rows"]}
     skills_by_ability: dict[str, list[dict[str, Any]]] = {}
@@ -3176,11 +3194,11 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
             <div class="dnd-layout-health-grid">
               <label class="dnd-layout-mini-field dnd-layout-health-field">
                 <span class="dnd-layout-label">Current</span>
-                {field(data["hp_value"], "dnd-layout-hp-current", "dnd-layout-input", numeric=True)}
+                {field(data["hp_value"], "dnd-layout-hp-current", "dnd-layout-input", numeric=True, print_value="")}
               </label>
               <label class="dnd-layout-mini-field dnd-layout-health-field">
                 <span class="dnd-layout-label">Temp</span>
-                {field(data["temp_hp"], "dnd-layout-hp-temp", "dnd-layout-input", numeric=True)}
+                {field(blank_zero(data["temp_hp"]), "dnd-layout-hp-temp", "dnd-layout-input", numeric=True)}
               </label>
               <label class="dnd-layout-mini-field dnd-layout-health-field">
                 <span class="dnd-layout-label">Max</span>
@@ -3194,9 +3212,12 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
             <div class="dnd-layout-hitdice-grid">
               <label class="dnd-layout-mini-field dnd-layout-hitdice-field">
                 <span class="dnd-layout-label">Spent</span>
-                {field(data["hit_dice_spent"], "dnd-layout-hitdice-spent", "dnd-layout-input", numeric=True)}
+                {field(blank_zero(data["hit_dice_spent"]), "dnd-layout-hitdice-spent", "dnd-layout-input", numeric=True)}
               </label>
-              <div class="dnd-layout-mini-stat dnd-layout-hitdice-total">Total <span class="value">{esc(f"{data['hit_dice_total']}d{str(data['hit_die_size']).lstrip('dD')}" if data['hit_die_size'] else data['hit_dice_total'])}</span></div>
+              <div class="dnd-layout-mini-stat dnd-layout-hitdice-total">
+                <span>Total</span>
+                <span class="value">{esc(f"{data['hit_dice_total']}d{str(data['hit_die_size']).lstrip('dD')}" if data['hit_die_size'] else data['hit_dice_total'])}</span>
+              </div>
             </div>
             <div class="dnd-layout-death-grid">
               <div class="death-track">
@@ -3397,8 +3418,16 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--ink-soft);
+      min-width: 0;
     }
-    .dnd-layout-toolbar-actions { display: flex; gap: 8px; }
+    .dnd-layout-toolbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      flex: 0 1 auto;
+      min-width: 260px;
+    }
     button {
       appearance: none;
       border: 1px solid var(--accent);
@@ -3407,6 +3436,9 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       background: var(--accent);
       color: var(--paper);
       font-size: 0.76rem;
+      line-height: 1.1;
+      min-height: 38px;
+      white-space: nowrap;
       cursor: pointer;
     }
     button.secondary {
@@ -3976,6 +4008,18 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       color: var(--ink-soft);
       font-style: italic;
     }
+    .dnd-layout-footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px 14px;
+      margin-top: 12px;
+      padding: 8px 10px 0;
+      border-top: 1px solid var(--rule-soft);
+      color: var(--ink-soft);
+      font: 0.66rem/1.35 var(--sans);
+      text-align: center;
+    }
     .ref-anchor { color: inherit; }
     @media (max-width: 960px) {
       .dnd-layout-header-grid,
@@ -3996,6 +4040,10 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       .dnd-layout-page-head {
         flex-direction: column;
         align-items: stretch;
+      }
+      .dnd-layout-toolbar-actions {
+        justify-content: flex-start;
+        min-width: 0;
       }
       .dnd-layout-identity-panel,
       .dnd-layout-pill-panel,
@@ -4269,6 +4317,11 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
         column-gap: 14px;
       }
       .dnd-layout-page:last-child { page-break-after: auto; }
+      .dnd-layout-footer {
+        margin-top: 0;
+        padding-top: 3mm;
+        font-size: 0.54rem;
+      }
       .dnd-layout-panel,
       .dnd-layout-ability-card,
       .dnd-layout-summary-card { break-inside: avoid; }
@@ -4282,11 +4335,27 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       const storageKey = {storage_key};
       const state = JSON.parse(localStorage.getItem(storageKey) || "{{}}");
       const persistNodes = document.querySelectorAll("[data-persist]");
+      const printValueNodes = document.querySelectorAll("[data-print-value]");
+      const livePrintValues = new Map();
       const autoSizeTextareas = () => {{
         for (const node of document.querySelectorAll("textarea.v2-field")) {{
           node.style.height = "auto";
           node.style.height = `${{Math.max(node.scrollHeight, node.offsetHeight)}}px`;
         }}
+      }};
+      const applyPrintValues = () => {{
+        for (const node of printValueNodes) {{
+          livePrintValues.set(node, node.value);
+          node.value = node.dataset.printValue || "";
+        }}
+        autoSizeTextareas();
+      }};
+      const restorePrintValues = () => {{
+        for (const [node, value] of livePrintValues.entries()) {{
+          node.value = value;
+        }}
+        livePrintValues.clear();
+        autoSizeTextareas();
       }};
 
       for (const node of persistNodes) {{
@@ -4312,6 +4381,8 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       }}
 
       autoSizeTextareas();
+      window.addEventListener("beforeprint", applyPrintValues);
+      window.addEventListener("afterprint", restorePrintValues);
       window.addEventListener("beforeprint", autoSizeTextareas);
 
       document.getElementById("print-dnd-layout")?.addEventListener("click", () => window.print());
@@ -4512,8 +4583,8 @@ def _sheet_mode_overrides(style: str, theme_palette: dict[str, str] | None = Non
 
     .sheet-toolbar button {{
       border-radius: 0 !important;
-      clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%);
-      padding-right: 18px !important;
+      min-width: max-content;
+      overflow: visible;
     }}
     .sheet-toolbar button.secondary {{
       border: 1px solid var(--accent);
@@ -4746,6 +4817,7 @@ def render_character_sheet(
     initial_theme: str | None = None,
     theme_palette: dict[str, str] | None = None,
     palette_decoration: str | None = None,
+    include_footer: bool = True,
 ) -> str:
     html = render_dnd_layout_template(data, sheet_id, style=style, palette=palette_decoration)
     html = html.replace(
@@ -4768,13 +4840,30 @@ def render_character_sheet(
     )
     html = html.replace(toggle_btn, new_btns, 1)
 
+    if include_footer:
+        footer_html = (
+            '<footer class="sheet-footer">'
+            '<span>Made by Stravinci @ stravinci.pt</span>'
+            '<span>Unofficial fan-made character sheet. Not affiliated with or endorsed by Wizards of the Coast.</span>'
+            '</footer>'
+        )
+        html = html.replace("\n    <script>", f"\n    {footer_html}\n    <script>", 1)
+
     theme_js = _sheet_theme_script(sheet_id, style, initial_theme=initial_theme)
     html = html.replace("</body>", f"<script>{theme_js}</script>\n  </body>", 1)
 
     return html
 
 
-def _render_one_theme(context: dict[str, Any], sheet_id: str, output_dir: Path, theme_label: str, entry: dict, mode: str | None) -> Path:
+def _render_one_theme(
+    context: dict[str, Any],
+    sheet_id: str,
+    output_dir: Path,
+    theme_label: str,
+    entry: dict,
+    mode: str | None,
+    include_footer: bool = True,
+) -> Path:
     html_path = output_dir / f"{sheet_id}-character-sheet-{theme_label.lstrip('#')}.html"
     palette = {
         "light_accent":        entry["light_accent"],
@@ -4789,6 +4878,7 @@ def _render_one_theme(context: dict[str, Any], sheet_id: str, output_dir: Path, 
         initial_theme=mode,
         theme_palette=palette,
         palette_decoration=entry.get("decoration"),
+        include_footer=include_footer,
     ))
     return html_path
 
@@ -4799,29 +4889,53 @@ def write_output(
     mode: str | None = None,
     theme: str | None = None,
     all_themes: bool = False,
+    include_footer: bool = True,
 ) -> list[Path]:
     actor = json.loads(actor_path.read_text())
     context = sheet_context(actor)
     sheet_id = slugify(actor.get("name", actor_path.stem))
 
     if all_themes:
-        return [_render_one_theme(context, sheet_id, output_dir, name, dict(entry), mode) for name, entry in THEMES.items()]
+        return [
+            _render_one_theme(context, sheet_id, output_dir, name, dict(entry), mode, include_footer=include_footer)
+            for name, entry in THEMES.items()
+        ]
 
     resolved = resolve_theme_entry(theme) if theme else resolve_theme_entry(primary_class_slug(actor))
     if resolved is None:
         # No actor class detected and no --theme passed → fall back to ledger
         resolved = ("ledger", dict(THEMES["ledger"]))
     label, entry = resolved
-    return [_render_one_theme(context, sheet_id, output_dir, label, entry, mode)]
+    return [_render_one_theme(context, sheet_id, output_dir, label, entry, mode, include_footer=include_footer)]
 
 
 def chromium_path(explicit: str | None) -> str | None:
     if explicit:
         return explicit
-    for candidate in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable"):
+    for candidate in (
+        "chromium",
+        "chromium-browser",
+        "google-chrome",
+        "google-chrome-stable",
+        "chrome",
+        "msedge",
+        "microsoft-edge",
+    ):
         found = shutil.which(candidate)
         if found:
             return found
+    platform_paths = [
+        Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+        Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
+        Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
+        Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+        Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+        Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
+        Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
+    ]
+    for candidate in platform_paths:
+        if candidate.exists():
+            return str(candidate)
     return None
 
 
@@ -4871,6 +4985,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--all-themes", action="store_true", help="Render one HTML per registered theme")
     parser.add_argument("--pdf", action="store_true", help="Also generate a PDF using local Chromium")
     parser.add_argument("--chromium", help="Explicit Chromium executable path")
+    parser.add_argument("--no-footer", action="store_true", help="Do not include the attribution/disclaimer footer")
     parser.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
     return parser.parse_args()
 
@@ -4884,6 +4999,7 @@ def main() -> int:
         mode=args.mode,
         theme=args.theme,
         all_themes=args.all_themes,
+        include_footer=not args.no_footer,
     )
     for path in html_paths:
         print(f"HTML written to {path}")
