@@ -125,11 +125,12 @@ python3 -m unittest discover -s tests
 Planned or wanted directions for the project. Contributions in any of these areas are welcome.
 
 - **Cross-platform parity.** Make browser detection and PDF export work out of the box on Linux, macOS, and Windows without per-OS manual setup.
+- **Semantic D&D resource trackers.** Foundry's `uses` data is not always a player-spendable resource. Trackers should appear for real limited-use class/subclass resources, such as Channel Divinity, Wild Shape, Bardic Inspiration, Rage, Second Wind, Action Surge, Focus/Ki points, Lay on Hands, Divine Sense, and Sorcery Points, while passive/source-granted features stay plain text.
 - **More curated palettes.** Popular color schemes such as Everforest, Tokyo Night, Gruvbox, Solarized, and One Dark, as well as dedicated light themes for daytime use.
 - **More tabletop RPG systems.** Today the renderer only understands Foundry's `dnd5e` actor schema. Adding adapters for other systems (Pathfinder 2e, Call of Cthulhu, Shadowdark, etc.) would make the project useful beyond D&D.
 - **Plug-and-play UI.** A small graphical front-end so users can pick the actor JSON, theme, and output mode without touching the CLI.
 - **Theme preview gallery.** Visual previews of every theme/mode combination so users can choose before generating.
-- **Per-system print profiles.** Optional Letter layout in addition to the current A4-first design.
+- **Per-system print tuning.** The generator supports A4 and Letter paper profiles today; future work should tune page density and content priorities per game system.
 
 ## Contributing
 

@@ -40,6 +40,9 @@
 
 ## Open
 
+- [ ] Make class-feature usage trackers semantic instead of trusting every Foundry `uses` field. Add clickable boxes only for genuinely spendable D&D resources such as Channel Divinity, Wild Shape, Bardic Inspiration, Rage, Second Wind, Action Surge, Focus/Ki points, Lay on Hands, Divine Sense, Sorcery Points, and similar class/subclass resources. Suppress misleading `uses 1` text for passive/source-granted features such as Spellcasting, domain spell lists, Magic Initiate, and ancestry traits.
 - [ ] Add a small plug-and-play interface so users can pick the actor JSON file, style/theme, and output mode, then run generation without using the CLI.
 - [ ] In that interface, show a visual preview for each style/theme so users can see what `ledger`, `codex`, `mono`, etc. look like before generating.
 - [ ] Validate PDF export on real macOS and Windows machines.
+- [ ] Change the thick vertical bar next to each stat (DEX, Con, ETC). It is too visually distracting. use the same thickness as the separating bars on inspiration, speed, etc.
+- [ ] bold each stat that is written out (Strength, Charisma, Constition,etc...) 
