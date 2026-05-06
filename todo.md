@@ -34,10 +34,10 @@
 - [x] Reworked the generated HTML toolbar buttons so they wrap instead of cutting off.
 - [x] Expanded browser detection with common macOS/Windows Chrome and Edge paths.
 - [x] Added smoke tests for HTML generation, footer toggling, and all-theme rendering.
+- [x] Added `--paper a4|letter` so PDF/print output can target US Letter in addition to the default A4 profile.
 
 ## Open
 
-- [ ] Check whether a separate Letter print profile is worth supporting in addition to the current A4-first layout.
 - [ ] Add a small plug-and-play interface so users can pick the actor JSON file, style/theme, and output mode, then run generation without using the CLI.
 - [ ] In that interface, show a visual preview for each style/theme so users can see what `ledger`, `codex`, `mono`, etc. look like before generating.
 - [ ] Validate browser detection and PDF export setup on real macOS and Windows machines.

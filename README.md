@@ -77,6 +77,12 @@ Generate a pure black-and-white printable PDF:
 python3 generate_character_sheet.py path/to/actor.json --mode mono --pdf
 ```
 
+Generate for US Letter paper instead of A4:
+
+```bash
+python3 generate_character_sheet.py path/to/actor.json --paper letter --pdf
+```
+
 Omit the generated attribution/disclaimer footer:
 
 ```bash
