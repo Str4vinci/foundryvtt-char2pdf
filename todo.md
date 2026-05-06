@@ -36,10 +36,10 @@
 - [x] Added smoke tests for HTML generation, footer toggling, and all-theme rendering.
 - [x] Added `--paper a4|letter` so PDF/print output can target US Letter in addition to the default A4 profile.
 - [x] Added a clearer `--print-browser` PDF export option and smoke coverage for browser autodetection fallbacks.
+- [x] Gave ability stats more visual emphasis with boxed ability abbreviations/scores and an accent rail.
 
 ## Open
 
 - [ ] Add a small plug-and-play interface so users can pick the actor JSON file, style/theme, and output mode, then run generation without using the CLI.
 - [ ] In that interface, show a visual preview for each style/theme so users can see what `ledger`, `codex`, `mono`, etc. look like before generating.
 - [ ] Validate PDF export on real macOS and Windows machines.
-- [ ] The stats (wis, con, etc) should have a bit more emphasis. Not sure how. Maybe also center to the middle as well. Or a box like level has (but smaller to not change the layout size too much).
