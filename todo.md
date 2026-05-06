@@ -29,16 +29,16 @@
 - [x] Shield value is centered.
 - [x] Speed displays with "ft" suffix.
 - [x] Added `@stravinci.pt` attribution at the top-left corner of the character name rectangle.
+- [x] Temp HP and spent hit dice render blank when their exported value is zero, while current HP stays available in HTML and blanks for print/PDF.
+- [x] Added a footer with Stravinci attribution and an unofficial fan-made sheet disclaimer, plus `--no-footer` to omit it.
+- [x] Reworked the generated HTML toolbar buttons so they wrap instead of cutting off.
+- [x] Expanded browser detection with common macOS/Windows Chrome and Edge paths.
+- [x] Added smoke tests for HTML generation, footer toggling, and all-theme rendering.
 
 ## Open
 
 - [ ] Check whether a separate Letter print profile is worth supporting in addition to the current A4-first layout.
 - [ ] Add a small plug-and-play interface so users can pick the actor JSON file, style/theme, and output mode, then run generation without using the CLI.
 - [ ] In that interface, show a visual preview for each style/theme so users can see what `ledger`, `codex`, `mono`, etc. look like before generating.
-- [ ] Make browser detection and PDF export setup OS-agnostic so macOS, Windows, and Linux users do not need platform-specific manual steps.
-- [ ] temp hp shouldn't say 0, should just be empty and allow players to write. Same for Spent hit dice. Total 3D8 is a bit awkward. maybe one above the other like the shield.
-- [ ] Remove displaying current hp by default, as players will write over that when printing. But for the html would be nice to have it... if too much work just don't have it written but allow to do so.
+- [ ] Validate browser detection and PDF export setup on real macOS and Windows machines.
 - [ ] The stats (wis, con, etc) should have a bit more emphasis. Not sure how. Maybe also center to the middle as well. Or a box like level has (but smaller to not change the layout size too much).
-- [ ] Add a footer: "Made by Stravinci @ stravinci.pt" with an optional flag to remove it. Footer should also include a copyright/disclaimer line clearing me of WotC/D&D copyright issues.
-- [ ] At the top of the html, rework the buttons. They are cutting and not displaying properly.
-
