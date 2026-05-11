@@ -688,6 +688,8 @@ def sheet_context(actor: dict[str, Any]) -> dict[str, Any]:
 
     spell_reference_count = len(active_spells)
     feature_reference_count = sum(len(entries) for entries in feature_groups.values())
+    has_any_slots = any(to_int(slot.get("value")) > 0 for slot in slot_defaults)
+    is_spellcaster = bool(spell_ability_code) or bool(active_spells) or has_any_slots
 
     return {
         "name": actor.get("name", "Character"),
@@ -730,6 +732,7 @@ def sheet_context(actor: dict[str, Any]) -> dict[str, Any]:
         "spell_mod": spell_ability_mod,
         "spell_dc": spell_dc,
         "spell_attack": spell_attack,
+        "is_spellcaster": is_spellcaster,
         "inspiration": bool(system.get("attributes", {}).get("inspiration")),
         "hit_dice_spent": hit_dice_spent,
         "hit_dice_total": total_level,
@@ -3055,12 +3058,14 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
             f'''
             <article class="dnd-layout-ability-card">
               <div class="ability-heading">
-                <span class="ability-code">{esc(row["code"])}</span>
                 <span class="ability-name">{esc(row["label"])}</span>
               </div>
               <div class="ability-core">
                 <div class="ability-mod">{esc(row["mod"])}</div>
-                <div class="ability-score">Score {esc(row["score"])}</div>
+                <div class="ability-score-wrap">
+                  <span class="ability-score-label">Score</span>
+                  <span class="ability-score">{esc(row["score"])}</span>
+                </div>
               </div>
               <div class="ability-save">
                 <span class="ability-skill-mark">{"●" if save_row["proficient"] else "○"}</span>
@@ -3129,6 +3134,54 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
         f'<label class="dnd-layout-coin-card"><span class="dnd-layout-label">{esc(code.upper())}</span>{field(data["currency_counts"][code], f"dnd-layout-coin-{code}", "dnd-layout-input", numeric=True)}</label>'
         for code in ["cp", "sp", "ep", "gp", "pp"]
     )
+
+    spellcasting_section_html = ""
+    if data["is_spellcaster"]:
+        spellcasting_section_html = f"""
+      <section class="dnd-layout-page dnd-layout-spell-page">
+        <div class="dnd-layout-page-head">
+          <div>
+            <div class="dnd-layout-page-title">Spellcasting</div>
+          </div>
+        </div>
+
+        <section class="dnd-layout-spell-summary">
+          <article class="dnd-layout-summary-card">
+            <span class="dnd-layout-label">Spellcasting</span>
+            <div class="value">{esc(data["spell_ability"])}</div>
+          </article>
+          <article class="dnd-layout-summary-card">
+            <span class="dnd-layout-label">Modifier</span>
+            <div class="value">{esc(signed(data["spell_mod"]))}</div>
+          </article>
+          <article class="dnd-layout-summary-card">
+            <span class="dnd-layout-label">Save DC</span>
+            <div class="value">{esc(data["spell_dc"] if data["spell_dc"] is not None else "—")}</div>
+          </article>
+          <article class="dnd-layout-summary-card">
+            <span class="dnd-layout-label">Spell Attack</span>
+            <div class="value">{esc(signed(data["spell_attack"]) if data["spell_attack"] is not None else "—")}</div>
+          </article>
+        </section>
+
+        <section class="dnd-layout-panel">
+          <div class="dnd-layout-section-title">Spell Slots</div>
+          <div class="dnd-layout-slot-grid">{''.join(slot_rows)}</div>
+        </section>
+
+        <section class="dnd-layout-panel dnd-layout-spellbook-panel dnd-layout-breakable-panel">
+          <div class="dnd-layout-section-title">Prepared Spells</div>
+          <div class="dnd-layout-spell-legend">
+            <span class="spell-flag on">Concentration</span>
+            <span class="spell-flag on">Ritual</span>
+            <span class="spell-flag on">Material</span>
+          </div>
+          <table class="dnd-layout-table dnd-layout-spell-table">
+            <tbody>{render_v2_spell_rows(data["active_spells"])}</tbody>
+          </table>
+        </section>
+      </section>
+"""
 
     body = f"""
     <div class="dnd-layout-shell">
@@ -3255,7 +3308,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
             <div class="value">{esc(data["size"])}</div>
           </article>
           <article class="dnd-layout-summary-card">
-            <span class="dnd-layout-label">Passive Perc.</span>
+            <span class="dnd-layout-label">Passive Perception</span>
             <div class="value">{esc(data["passive_perception"])}</div>
           </article>
           <article class="dnd-layout-summary-card">
@@ -3315,51 +3368,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
         </div>
       </section>
 
-      <section class="dnd-layout-page">
-        <div class="dnd-layout-page-head">
-          <div>
-            <div class="dnd-layout-page-title">Spellcasting</div>
-          </div>
-        </div>
-
-        <section class="dnd-layout-spell-summary">
-          <article class="dnd-layout-summary-card">
-            <span class="dnd-layout-label">Spellcasting</span>
-            <div class="value">{esc(data["spell_ability"])}</div>
-          </article>
-          <article class="dnd-layout-summary-card">
-            <span class="dnd-layout-label">Modifier</span>
-            <div class="value">{esc(signed(data["spell_mod"]))}</div>
-          </article>
-          <article class="dnd-layout-summary-card">
-            <span class="dnd-layout-label">Save DC</span>
-            <div class="value">{esc(data["spell_dc"] if data["spell_dc"] is not None else "—")}</div>
-          </article>
-          <article class="dnd-layout-summary-card">
-            <span class="dnd-layout-label">Spell Attack</span>
-            <div class="value">{esc(signed(data["spell_attack"]) if data["spell_attack"] is not None else "—")}</div>
-          </article>
-        </section>
-
-        <section class="dnd-layout-panel">
-          <div class="dnd-layout-section-title">Spell Slots</div>
-          <div class="dnd-layout-slot-grid">{''.join(slot_rows)}</div>
-        </section>
-
-        <section class="dnd-layout-panel dnd-layout-spellbook-panel dnd-layout-breakable-panel">
-          <div class="dnd-layout-section-title">Prepared Spells</div>
-          <div class="dnd-layout-spell-legend">
-            <span class="spell-flag on">Concentration</span>
-            <span class="spell-flag on">Ritual</span>
-            <span class="spell-flag on">Material</span>
-          </div>
-          <table class="dnd-layout-table dnd-layout-spell-table">
-            <tbody>{render_v2_spell_rows(data["active_spells"])}</tbody>
-          </table>
-        </section>
-      </section>
-
-      <section class="dnd-layout-page">
+      <section class="dnd-layout-page dnd-layout-equipment-page">
         <div class="dnd-layout-page-head">
           <div>
             <div class="dnd-layout-page-title">Equipment & Notes</div>
@@ -3384,6 +3393,8 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
           {field(equipment_text, "dnd-layout-equipment", "dnd-layout-input dnd-layout-area equipment-area", multiline=True)}
         </section>
       </section>
+
+      {spellcasting_section_html}
     </div>
     """
 
@@ -3473,7 +3484,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       padding-bottom: 12px;
       border-bottom: 1px solid var(--rule-soft);
     }
-    .dnd-layout-page-head > div:first-child { padding: 6px 0 0 6px; }
+    .dnd-layout-page-head > div:first-of-type { padding: 18px 0 0 22px; }
     .dnd-layout-attribution {
       position: absolute;
       top: 2px;
@@ -3739,58 +3750,64 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
     }
     .ability-heading {
       display: flex;
-      justify-content: space-between;
-      gap: 8px;
+      justify-content: center;
       align-items: baseline;
       margin-bottom: 8px;
     }
-    .ability-code {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 2.5rem;
-      min-height: 1.8rem;
-      padding: 0 0.28rem;
-      border: 1px solid var(--accent);
-      background: rgba(255,255,255,0.22);
-      font-family: var(--display);
-      font-size: 1.04rem;
-      line-height: 1;
-      color: var(--accent);
-    }
     .ability-name {
       font-family: var(--sans);
-      font-size: 0.74rem;
-      letter-spacing: 0.12em;
+      font-size: 0.82rem;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--ink-soft);
+      color: var(--ink);
+      font-weight: 600;
+      text-align: center;
     }
     .ability-core {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+      justify-content: center;
+      gap: 14px;
       padding-bottom: 8px;
       border-bottom: 1px solid var(--rule-soft);
       margin-bottom: 8px;
     }
     .ability-mod {
       font-family: var(--display);
-      font-size: 2rem;
+      font-size: 2.2rem;
       line-height: 1;
+      font-weight: 700;
       color: var(--accent);
+      text-align: center;
+      min-width: 2.4rem;
+    }
+    .ability-score-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .ability-score-label {
+      font-family: var(--sans);
+      font-size: 0.58rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
     }
     .ability-score {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 3.4rem;
-      min-height: 1.8rem;
+      min-width: 2.2rem;
+      min-height: 1.5rem;
+      padding: 0 0.4rem;
       border: 1px solid var(--rule-soft);
       background: rgba(255,255,255,0.16);
       font-family: var(--mono);
-      font-size: 0.86rem;
-      color: var(--ink-soft);
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-align: center;
+      color: var(--ink);
     }
     .ability-save {
       display: grid;
@@ -4097,13 +4114,16 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
         box-shadow: none;
         margin: 0 0 7mm;
         padding: 10px;
-        page-break-after: always;
+        break-inside: auto;
       }
+      .dnd-layout-page:last-child { margin-bottom: 0; }
+      .dnd-layout-spell-page,
+      .dnd-layout-equipment-page { break-before: page; }
       .dnd-layout-page-head {
         margin-bottom: 8px;
         padding-bottom: 6px;
       }
-      .dnd-layout-page-head > div:first-child { padding: 5px 0 0 8px; }
+      .dnd-layout-page-head > div:first-of-type { padding: 1px 0 0 2px; }
       .dnd-layout-page-title { font-size: 1.24rem; }
       .dnd-layout-page-subtitle {
         margin-top: 3px;
@@ -4124,6 +4144,11 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       .dnd-layout-first-grid {
         grid-template-columns: minmax(0, 1.02fr) minmax(0, 1.28fr) !important;
         gap: 6px !important;
+        break-inside: auto;
+      }
+      .dnd-layout-first-grid > .dnd-layout-left-column,
+      .dnd-layout-first-grid > .dnd-layout-right-column {
+        break-inside: auto;
       }
       .dnd-layout-second-grid {
         grid-template-columns: minmax(0, 1.26fr) minmax(0, 0.84fr) !important;
@@ -4177,8 +4202,46 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       .dnd-layout-level-panel,
       .dnd-layout-armor-panel { gap: 4px; }
       .dnd-layout-panel {
-        padding: 8px;
-        break-inside: avoid;
+        padding: 10px;
+      }
+      .dnd-layout-panel ul:not(.ability-skill-list) {
+        padding-left: 14px;
+        line-height: 1.15;
+        font-size: 0.78rem;
+      }
+      .dnd-layout-panel ul:not(.ability-skill-list) li {
+        margin-bottom: 1.5px;
+      }
+      .dnd-layout-panel .source-note {
+        font-size: 0.7rem;
+      }
+      .sheet-panel {
+        background-position:
+          top 2px left 2px, top 2px left 2px,
+          top 2px right 2px, top 2px right 2px,
+          bottom 2px left 2px, bottom 2px left 2px,
+          bottom 2px right 2px, bottom 2px right 2px,
+          top left !important;
+        background-size:
+          7px 1.2px, 1.2px 7px,
+          7px 1.2px, 1.2px 7px,
+          7px 1.2px, 1.2px 7px,
+          7px 1.2px, 1.2px 7px,
+          100% 100% !important;
+      }
+      .sheet-page {
+        background-position:
+          top 4px left 4px, top 4px left 4px,
+          top 4px right 4px, top 4px right 4px,
+          bottom 4px left 4px, bottom 4px left 4px,
+          bottom 4px right 4px, bottom 4px right 4px,
+          top left, top left !important;
+        background-size:
+          14px 1.6px, 1.6px 14px,
+          14px 1.6px, 1.6px 14px,
+          14px 1.6px, 1.6px 14px,
+          14px 1.6px, 1.6px 14px,
+          100% 90px, 100% 100% !important;
       }
       .dnd-layout-section-title { margin: 0 0 6px; }
       .dnd-layout-header-grid .dnd-layout-section-title {
@@ -4203,8 +4266,8 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       }
       .dnd-layout-summary-card .value { font-size: 1.02rem; }
       .dnd-layout-armor-panel .dnd-layout-pill-number {
-        align-items: flex-end;
-        padding-bottom: 2px;
+        align-items: center;
+        padding: 0;
       }
       .dnd-layout-armor-shield {
         gap: 1px;
@@ -4302,9 +4365,10 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
         font-size: 0.78rem;
       }
       .ability-score {
-        min-width: 2.8rem;
-        min-height: 1.35rem;
-        font-size: 0.62rem;
+        min-width: 1.9rem;
+        min-height: 1.3rem;
+        font-size: 0.8rem;
+        font-weight: 700;
       }
       .ability-skill-group {
         margin-top: 6px;
@@ -4995,7 +5059,7 @@ def render_pdf(html_path: Path, pdf_path: Path, browser: str, mode: str | None =
         "--no-sandbox",
         "--allow-file-access-from-files",
         "--virtual-time-budget=1500",
-        "--print-to-pdf-no-header",
+        "--no-pdf-header-footer",
         f"--print-to-pdf={pdf_path}",
         target_uri,
     ]
