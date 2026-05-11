@@ -4,6 +4,8 @@ __pycache__/
 output/
 output_*/
 
+voria_chars/
+
 DnD_2024_Character-Sheet.pdf
 fvtt-Actor-*.json
 visualguide.md
