@@ -37,6 +37,8 @@
 - [x] Added `--paper a4|letter` so PDF/print output can target US Letter in addition to the default A4 profile.
 - [x] Added a clearer `--print-browser` PDF export option and smoke coverage for browser autodetection fallbacks.
 - [x] Gave ability stats more visual emphasis with boxed ability abbreviations/scores and an accent rail.
+- [x] Thinned the vertical accent rail on each ability card so it matches the 1px separators used elsewhere on the sheet.
+- [x] Bolded the written-out ability names (Strength, Dexterity, Constitution, Intelligence, Wisdom, Charisma).
 
 ## Open
 
@@ -44,5 +46,3 @@
 - [ ] Add a small plug-and-play interface so users can pick the actor JSON file, style/theme, and output mode, then run generation without using the CLI.
 - [ ] In that interface, show a visual preview for each style/theme so users can see what `ledger`, `codex`, `mono`, etc. look like before generating.
 - [ ] Validate PDF export on real macOS and Windows machines.
-- [ ] Change the thick vertical bar next to each stat (DEX, Con, ETC). It is too visually distracting. use the same thickness as the separating bars on inspiration, speed, etc.
-- [ ] bold each stat that is written out (Strength, Charisma, Constition,etc...) 

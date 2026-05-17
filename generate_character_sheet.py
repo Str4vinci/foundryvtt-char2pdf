@@ -3746,7 +3746,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       border-radius: calc(var(--radius) - 6px);
       background: rgba(255,255,255,0.22);
       padding: 10px;
-      box-shadow: inset 3px 0 0 var(--accent);
+      box-shadow: inset 1px 0 0 var(--accent);
     }
     .ability-heading {
       display: flex;
@@ -3760,7 +3760,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       letter-spacing: 0.16em;
       text-transform: uppercase;
       color: var(--ink);
-      font-weight: 600;
+      font-weight: 700;
       text-align: center;
     }
     .ability-core {
