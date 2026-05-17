@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 APP_STORAGE_VERSION = APP_VERSION.replace(".", "-")
 
 ABILITY_ORDER = ["str", "dex", "con", "int", "wis", "cha"]
