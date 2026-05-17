@@ -675,6 +675,57 @@ def aggregate_spells(actor: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[
     return active_spells, spell_library
 
 
+_SCALING_VARIANT_RE = re.compile(r"^(.+?)-d(\d+)$")
+
+
+def _collapse_scaling_variants(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not entries:
+        return entries
+    base_of: list[str | None] = []
+    tier_of: list[int] = []
+    for entry in entries:
+        ident = (entry.get("identifier") or "").lower()
+        if not ident:
+            base_of.append(None)
+            tier_of.append(0)
+            continue
+        match = _SCALING_VARIANT_RE.match(ident)
+        if match:
+            base_of.append(match.group(1))
+            tier_of.append(int(match.group(2)))
+        else:
+            base_of.append(ident)
+            tier_of.append(0)
+    max_tier: dict[str, int] = {}
+    for base, tier in zip(base_of, tier_of):
+        if base is None:
+            continue
+        if tier > max_tier.get(base, 0):
+            max_tier[base] = tier
+    if not any(v > 0 for v in max_tier.values()):
+        return entries
+    winner_idx: dict[str, int] = {}
+    for i, base in enumerate(base_of):
+        if base is None or max_tier.get(base, 0) == 0:
+            continue
+        if tier_of[i] == max_tier[base]:
+            winner_idx.setdefault(base, i)
+    kept: list[dict[str, Any]] = []
+    placed: set[int] = set()
+    for i, entry in enumerate(entries):
+        base = base_of[i]
+        if base is None or max_tier.get(base, 0) == 0:
+            kept.append(entry)
+            continue
+        win = winner_idx[base]
+        if win in placed:
+            continue
+        if i == win or tier_of[i] == 0:
+            kept.append(entries[win])
+            placed.add(win)
+    return kept
+
+
 def collect_features(
     actor: dict[str, Any],
     formula_ctx: dict[str, int] | None = None,
@@ -713,6 +764,8 @@ def collect_features(
             groups["Class Features"].append(entry)
         else:
             groups["Feats"].append(entry)
+    for key, items in groups.items():
+        groups[key] = _collapse_scaling_variants(items)
     return groups
 
 

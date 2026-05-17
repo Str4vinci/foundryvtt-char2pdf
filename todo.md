@@ -42,6 +42,7 @@
 - [x] Made class-feature usage trackers semantic. Clickable diamond pips now render only for whitelisted spendable D&D resources (Channel Divinity, Wild Shape, Bardic Inspiration, Rage, Second Wind, Action Surge, Ki/Focus, Lay on Hands, Divine Sense, Sorcery Points, Mystic Arcanum, Lucky, Healing Light, Tomb of Levistus, Arcane Recovery, Breath Weapon, Relentless Endurance, etc.). Misleading "uses N" text on passive/source-granted features (Spellcasting, domain spell lists, Magic Initiate, racial traits like Trance / Elven Lineage) is suppressed.
 - [x] Tightened the HTML page-title padding so the title hugs the decorative corner bracket the way the PDF already does.
 - [x] Resolved Foundry formula `uses.max` values (`@prof`, `@abilities.X.mod`, `@scale.<class>.<feature>`, plus arithmetic and `max`/`min`/`floor`/`ceil`/`round`/`abs`) via a small safe AST evaluator. Action Surge now resolves through the class ScaleValue advancement and Bardic Inspiration (d8) resolves through the Cha modifier, so both get the right pip counts.
+- [x] Collapsed scaling-die feat variants (e.g. `bardic-inspiration` + `bardic-inspiration-d8`) so the sheet only shows the variant matching the character's current level. The kept variant takes the position of the base entry to avoid being pushed past the panel's truncation cap.
 
 ## Open
 - [ ] Add a small plug-and-play interface so users can pick the actor JSON file, style/theme, and output mode, then run generation without using the CLI.
