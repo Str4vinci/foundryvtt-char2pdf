@@ -3484,7 +3484,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       padding-bottom: 12px;
       border-bottom: 1px solid var(--rule-soft);
     }
-    .dnd-layout-page-head > div:first-of-type { padding: 18px 0 0 22px; }
+    .dnd-layout-page-head > div:first-of-type { padding: 2px 0 0 4px; }
     .dnd-layout-attribution {
       position: absolute;
       top: 2px;
