@@ -98,6 +98,11 @@ UNIT_LABELS = {
     "hour": "Hour",
 }
 
+POOL_RESOURCE_IDS: frozenset[str] = frozenset({
+    "lay-on-hands",
+    "healing-light",
+})
+
 SPENDABLE_RESOURCE_IDS: frozenset[str] = frozenset({
     "bardic-inspiration",
     "bardic-inspiration-d8",
@@ -159,6 +164,13 @@ def is_spendable_resource(entry: dict[str, Any]) -> bool:
     if identifier and identifier in SPENDABLE_RESOURCE_IDS:
         return True
     return slugify(entry.get("name", "")) in SPENDABLE_RESOURCE_IDS
+
+
+def is_pool_resource(entry: dict[str, Any]) -> bool:
+    identifier = (entry.get("identifier") or "").strip().lower()
+    if identifier and identifier in POOL_RESOURCE_IDS:
+        return True
+    return slugify(entry.get("name", "")) in POOL_RESOURCE_IDS
 
 
 _FORMULA_FUNCS = {
@@ -1585,7 +1597,18 @@ def render_v2_list(
         if is_spendable_resource(entry):
             count = to_int(entry.get("uses_max"))
             key_prefix = f"{sheet_id}-feature-{group_key}-{idx}"
-            suffix_html = f' <span class="feature-uses">{render_tracker_pips(count, key_prefix)}</span>'
+            if is_pool_resource(entry):
+                pool_key = esc(f"{key_prefix}-pool")
+                suffix_html = (
+                    f' <span class="feature-pool">'
+                    f'<input class="feature-pool-input" type="number" min="0" max="{count}" '
+                    f'inputmode="numeric" data-persist="{pool_key}" value="{count}">'
+                    f'<span class="feature-pool-sep">/</span>'
+                    f'<span class="feature-pool-max">{count}</span>'
+                    f'</span>'
+                )
+            else:
+                suffix_html = f' <span class="feature-uses">{render_tracker_pips(count, key_prefix)}</span>'
         rows.append(
             f'<li>{render_reference_anchor(entry["name"])}{suffix_html}</li>'
         )
@@ -4189,6 +4212,34 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
     }
     .feature-uses .slot-pip { width: 12px; height: 12px; }
     .feature-uses .slot-pip span { width: 7px; height: 7px; border-width: 1px; }
+    .feature-pool {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 3px;
+      margin-left: 6px;
+      vertical-align: middle;
+      font-variant-numeric: tabular-nums;
+    }
+    .feature-pool-input {
+      width: 2.4rem;
+      padding: 0 2px;
+      border: 0;
+      border-bottom: 1px solid var(--rule-soft);
+      background: transparent;
+      color: var(--ink);
+      text-align: right;
+      font: inherit;
+      outline: none;
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+    .feature-pool-input::-webkit-inner-spin-button,
+    .feature-pool-input::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .feature-pool-input:focus { border-bottom-color: var(--accent); }
+    .feature-pool-sep, .feature-pool-max { color: var(--ink-soft); font-size: 0.92em; }
     .dnd-layout-table {
       width: 100%;
       border-collapse: collapse;

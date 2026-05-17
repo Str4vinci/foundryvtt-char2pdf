@@ -43,6 +43,7 @@
 - [x] Tightened the HTML page-title padding so the title hugs the decorative corner bracket the way the PDF already does.
 - [x] Resolved Foundry formula `uses.max` values (`@prof`, `@abilities.X.mod`, `@scale.<class>.<feature>`, plus arithmetic and `max`/`min`/`floor`/`ceil`/`round`/`abs`) via a small safe AST evaluator. Action Surge now resolves through the class ScaleValue advancement and Bardic Inspiration (d8) resolves through the Cha modifier, so both get the right pip counts.
 - [x] Collapsed scaling-die feat variants (e.g. `bardic-inspiration` + `bardic-inspiration-d8`) so the sheet only shows the variant matching the character's current level. The kept variant takes the position of the base entry to avoid being pushed past the panel's truncation cap.
+- [x] Added a per-resource render override (`POOL_RESOURCE_IDS`) so pool-style resources like Lay on Hands (hp pool) and Healing Light (d6 pool) render as a small `current / max` numeric input instead of a long row of pips. New resources can be added to the set as they come up.
 
 ## Open
 - [ ] Add a small plug-and-play interface so users can pick the actor JSON file, style/theme, and output mode, then run generation without using the CLI.
