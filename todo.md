@@ -39,10 +39,11 @@
 - [x] Gave ability stats more visual emphasis with boxed ability abbreviations/scores and an accent rail.
 - [x] Thinned the vertical accent rail on each ability card so it matches the 1px separators used elsewhere on the sheet.
 - [x] Bolded the written-out ability names (Strength, Dexterity, Constitution, Intelligence, Wisdom, Charisma).
+- [x] Made class-feature usage trackers semantic. Clickable diamond pips now render only for whitelisted spendable D&D resources (Channel Divinity, Wild Shape, Bardic Inspiration, Rage, Second Wind, Action Surge, Ki/Focus, Lay on Hands, Divine Sense, Sorcery Points, Mystic Arcanum, Lucky, Healing Light, Tomb of Levistus, Arcane Recovery, Breath Weapon, Relentless Endurance, etc.). Misleading "uses N" text on passive/source-granted features (Spellcasting, domain spell lists, Magic Initiate, racial traits like Trance / Elven Lineage) is suppressed.
+- [x] Tightened the HTML page-title padding so the title hugs the decorative corner bracket the way the PDF already does.
+- [x] Resolved Foundry formula `uses.max` values (`@prof`, `@abilities.X.mod`, `@scale.<class>.<feature>`, plus arithmetic and `max`/`min`/`floor`/`ceil`/`round`/`abs`) via a small safe AST evaluator. Action Surge now resolves through the class ScaleValue advancement and Bardic Inspiration (d8) resolves through the Cha modifier, so both get the right pip counts.
 
 ## Open
-
-- [ ] Make class-feature usage trackers semantic instead of trusting every Foundry `uses` field. Add clickable boxes only for genuinely spendable D&D resources such as Channel Divinity, Wild Shape, Bardic Inspiration, Rage, Second Wind, Action Surge, Focus/Ki points, Lay on Hands, Divine Sense, Sorcery Points, and similar class/subclass resources. Suppress misleading `uses 1` text for passive/source-granted features such as Spellcasting, domain spell lists, Magic Initiate, and ancestry traits.
 - [ ] Add a small plug-and-play interface so users can pick the actor JSON file, style/theme, and output mode, then run generation without using the CLI.
 - [ ] In that interface, show a visual preview for each style/theme so users can see what `ledger`, `codex`, `mono`, etc. look like before generating.
 - [ ] Validate PDF export on real macOS and Windows machines.
