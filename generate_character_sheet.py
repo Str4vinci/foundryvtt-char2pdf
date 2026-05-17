@@ -7,6 +7,7 @@ Current support is focused on the dnd5e system and D&D 2024-style actor data.
 from __future__ import annotations
 
 import argparse
+import ast
 import html
 import json
 import math
@@ -19,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 APP_STORAGE_VERSION = APP_VERSION.replace(".", "-")
 
 ABILITY_ORDER = ["str", "dex", "con", "int", "wis", "cha"]
@@ -97,6 +98,44 @@ UNIT_LABELS = {
     "hour": "Hour",
 }
 
+POOL_RESOURCE_IDS: frozenset[str] = frozenset({
+    "lay-on-hands",
+    "healing-light",
+})
+
+SPENDABLE_RESOURCE_IDS: frozenset[str] = frozenset({
+    "bardic-inspiration",
+    "bardic-inspiration-d8",
+    "rage",
+    "channel-divinity",
+    "divine-intervention",
+    "wild-shape",
+    "wild-companion",
+    "second-wind",
+    "action-surge",
+    "indomitable",
+    "superiority-dice",
+    "combat-superiority",
+    "ki",
+    "ki-points",
+    "focus-points",
+    "stunning-strike",
+    "wholeness-of-body",
+    "quickened-healing",
+    "divine-sense",
+    "lay-on-hands",
+    "sorcery-points",
+    "font-of-magic",
+    "mystic-arcanum",
+    "healing-light",
+    "tomb-of-levistus",
+    "arcane-recovery",
+    "lucky",
+    "fey-touched",
+    "breath-weapon",
+    "relentless-endurance",
+})
+
 
 def slugify(value: str) -> str:
     value = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
@@ -116,6 +155,127 @@ def to_number(value: Any, default: float = 0) -> float:
 
 def to_int(value: Any, default: int = 0) -> int:
     return int(round(to_number(value, default)))
+
+
+def is_spendable_resource(entry: dict[str, Any]) -> bool:
+    if to_int(entry.get("uses_max")) < 1:
+        return False
+    identifier = (entry.get("identifier") or "").strip().lower()
+    if identifier and identifier in SPENDABLE_RESOURCE_IDS:
+        return True
+    return slugify(entry.get("name", "")) in SPENDABLE_RESOURCE_IDS
+
+
+def is_pool_resource(entry: dict[str, Any]) -> bool:
+    identifier = (entry.get("identifier") or "").strip().lower()
+    if identifier and identifier in POOL_RESOURCE_IDS:
+        return True
+    return slugify(entry.get("name", "")) in POOL_RESOURCE_IDS
+
+
+_FORMULA_FUNCS = {
+    "max": max,
+    "min": min,
+    "abs": abs,
+    "floor": math.floor,
+    "ceil": math.ceil,
+    "round": round,
+}
+
+
+def _eval_formula_node(node: ast.AST) -> float:
+    if isinstance(node, ast.Expression):
+        return _eval_formula_node(node.body)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+        return float(node.value)
+    if isinstance(node, ast.UnaryOp):
+        operand = _eval_formula_node(node.operand)
+        if isinstance(node.op, ast.USub):
+            return -operand
+        if isinstance(node.op, ast.UAdd):
+            return operand
+        raise ValueError("unsupported unary op")
+    if isinstance(node, ast.BinOp):
+        left = _eval_formula_node(node.left)
+        right = _eval_formula_node(node.right)
+        if isinstance(node.op, ast.Add): return left + right
+        if isinstance(node.op, ast.Sub): return left - right
+        if isinstance(node.op, ast.Mult): return left * right
+        if isinstance(node.op, ast.Div): return left / right if right else 0.0
+        if isinstance(node.op, ast.FloorDiv): return left // right if right else 0.0
+        if isinstance(node.op, ast.Mod): return left % right if right else 0.0
+        raise ValueError("unsupported binop")
+    if isinstance(node, ast.Call):
+        if not isinstance(node.func, ast.Name) or node.func.id not in _FORMULA_FUNCS or node.keywords:
+            raise ValueError("disallowed call")
+        return float(_FORMULA_FUNCS[node.func.id](*(_eval_formula_node(a) for a in node.args)))
+    raise ValueError(f"unsupported node {type(node).__name__}")
+
+
+def resolve_formula(raw: Any, ctx: dict[str, int]) -> int:
+    if isinstance(raw, bool):
+        return 0
+    if isinstance(raw, (int, float)):
+        return int(round(raw))
+    if not isinstance(raw, str):
+        return 0
+    expr = raw.strip()
+    if not expr:
+        return 0
+    if expr.lstrip("-").isdigit():
+        return int(expr)
+    expr = re.sub(r"@[\w.\-]+", lambda m: str(ctx.get(m.group(0), 0)), expr)
+    try:
+        return int(round(_eval_formula_node(ast.parse(expr, mode="eval"))))
+    except Exception:
+        return 0
+
+
+def build_formula_context(actor: dict[str, Any]) -> dict[str, int]:
+    system = actor.get("system", {}) or {}
+    abilities = system.get("abilities", {}) or {}
+    classes = list(find_items(actor, "class"))
+    total_level = sum(to_int(c.get("system", {}).get("levels")) for c in classes)
+    ctx: dict[str, int] = {
+        "@prof": proficiency_bonus(total_level),
+        "@details.level": total_level,
+        "@classes.level": total_level,
+    }
+    for code in ABILITY_ORDER:
+        score = to_int((abilities.get(code) or {}).get("value"))
+        mod = ability_mod(score)
+        ctx[f"@abilities.{code}.mod"] = mod
+        ctx[f"@abilities.{code}.value"] = score
+        ctx[f"@abilities.{code}.save"] = mod
+    for cls in classes:
+        cls_sys = cls.get("system", {}) or {}
+        cls_id = (cls_sys.get("identifier") or slugify(cls.get("name", ""))).lower()
+        levels = to_int(cls_sys.get("levels"))
+        ctx[f"@classes.{cls_id}.levels"] = levels
+        adv = cls_sys.get("advancement") or {}
+        adv_iter = adv.values() if isinstance(adv, dict) else adv
+        for record in adv_iter:
+            if not isinstance(record, dict) or record.get("type") != "ScaleValue":
+                continue
+            cfg = record.get("configuration", {}) or {}
+            scale_id = (cfg.get("identifier") or "").strip().lower()
+            if not scale_id:
+                continue
+            best: int | None = None
+            for lvl_key, entry in (cfg.get("scale") or {}).items():
+                try:
+                    lvl = int(lvl_key)
+                except (TypeError, ValueError):
+                    continue
+                if lvl > levels:
+                    continue
+                value = entry.get("value") if isinstance(entry, dict) else entry
+                resolved = to_int(value)
+                if resolved:
+                    best = resolved
+            if best is not None:
+                ctx[f"@scale.{cls_id}.{scale_id}"] = best
+    return ctx
 
 
 def ability_mod(score: int) -> int:
@@ -527,7 +687,62 @@ def aggregate_spells(actor: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[
     return active_spells, spell_library
 
 
-def collect_features(actor: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+_SCALING_VARIANT_RE = re.compile(r"^(.+?)-d(\d+)$")
+
+
+def _collapse_scaling_variants(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not entries:
+        return entries
+    base_of: list[str | None] = []
+    tier_of: list[int] = []
+    for entry in entries:
+        ident = (entry.get("identifier") or "").lower()
+        if not ident:
+            base_of.append(None)
+            tier_of.append(0)
+            continue
+        match = _SCALING_VARIANT_RE.match(ident)
+        if match:
+            base_of.append(match.group(1))
+            tier_of.append(int(match.group(2)))
+        else:
+            base_of.append(ident)
+            tier_of.append(0)
+    max_tier: dict[str, int] = {}
+    for base, tier in zip(base_of, tier_of):
+        if base is None:
+            continue
+        if tier > max_tier.get(base, 0):
+            max_tier[base] = tier
+    if not any(v > 0 for v in max_tier.values()):
+        return entries
+    winner_idx: dict[str, int] = {}
+    for i, base in enumerate(base_of):
+        if base is None or max_tier.get(base, 0) == 0:
+            continue
+        if tier_of[i] == max_tier[base]:
+            winner_idx.setdefault(base, i)
+    kept: list[dict[str, Any]] = []
+    placed: set[int] = set()
+    for i, entry in enumerate(entries):
+        base = base_of[i]
+        if base is None or max_tier.get(base, 0) == 0:
+            kept.append(entry)
+            continue
+        win = winner_idx[base]
+        if win in placed:
+            continue
+        if i == win or tier_of[i] == 0:
+            kept.append(entries[win])
+            placed.add(win)
+    return kept
+
+
+def collect_features(
+    actor: dict[str, Any],
+    formula_ctx: dict[str, int] | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    ctx = formula_ctx if formula_ctx is not None else build_formula_context(actor)
     groups: dict[str, list[dict[str, Any]]] = {
         "Ancestry": [],
         "Class Features": [],
@@ -539,9 +754,12 @@ def collect_features(actor: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
         full_description = compact_text(sys_data.get("description", {}).get("value", ""))
         description = first_sentence(sys_data.get("description", {}).get("value", ""))
         activity = first_activity(sys_data) or {}
+        uses_data = sys_data.get("uses", {}) or {}
         entry = {
             "name": item.get("name", "Feature"),
-            "uses": sys_data.get("uses", {}),
+            "identifier": sys_data.get("identifier", ""),
+            "uses": uses_data,
+            "uses_max": resolve_formula(uses_data.get("max"), ctx),
             "requirements": sys_data.get("requirements", ""),
             "description": description,
             "full_description": full_description,
@@ -558,6 +776,8 @@ def collect_features(actor: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
             groups["Class Features"].append(entry)
         else:
             groups["Feats"].append(entry)
+    for key, items in groups.items():
+        groups[key] = _collapse_scaling_variants(items)
     return groups
 
 
@@ -1363,18 +1583,34 @@ def render_v2_field(
     return f'<input class="v2-field {esc(class_name)}" type="text" data-persist="{esc(key)}" value="{esc(value)}"{print_attr}>'
 
 
-def render_v2_list(entries: list[dict[str, Any]], max_items: int = 10) -> str:
+def render_v2_list(
+    entries: list[dict[str, Any]],
+    max_items: int = 10,
+    sheet_id: str = "",
+    group_key: str = "",
+) -> str:
     if not entries:
         return ""
     rows = []
-    for entry in entries[:max_items]:
-        suffix = []
-        if entry.get("uses", {}).get("max"):
-            suffix.append(f"uses {entry['uses']['max']}")
+    for idx, entry in enumerate(entries[:max_items]):
+        suffix_html = ""
+        if is_spendable_resource(entry):
+            count = to_int(entry.get("uses_max"))
+            key_prefix = f"{sheet_id}-feature-{group_key}-{idx}"
+            if is_pool_resource(entry):
+                pool_key = esc(f"{key_prefix}-pool")
+                suffix_html = (
+                    f' <span class="feature-pool">'
+                    f'<input class="feature-pool-input" type="number" min="0" max="{count}" '
+                    f'inputmode="numeric" data-persist="{pool_key}" value="{count}">'
+                    f'<span class="feature-pool-sep">/</span>'
+                    f'<span class="feature-pool-max">{count}</span>'
+                    f'</span>'
+                )
+            else:
+                suffix_html = f' <span class="feature-uses">{render_tracker_pips(count, key_prefix)}</span>'
         rows.append(
-            f'<li>{render_reference_anchor(entry["name"])}'
-            + (f' <span class="source-note">{" · ".join(suffix)}</span>' if suffix else "")
-            + "</li>"
+            f'<li>{render_reference_anchor(entry["name"])}{suffix_html}</li>'
         )
     return "<ul>" + "".join(rows) + "</ul>"
 
@@ -3100,9 +3336,9 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
     class_entries = data["feature_groups"].get("Class Features", [])
     species_entries = data["feature_groups"].get("Ancestry", [])
     feat_entries = data["feature_groups"].get("Feats", [])
-    class_features_html = render_v2_list(class_entries, 12) or '<p class="muted">No class features exported.</p>'
-    species_traits_html = render_v2_list(species_entries, 10) or '<p class="muted">No ancestry traits exported.</p>'
-    feats_html = render_v2_list(feat_entries, 10) or '<p class="muted">No feats exported.</p>'
+    class_features_html = render_v2_list(class_entries, 12, sheet_id, "class") or '<p class="muted">No class features exported.</p>'
+    species_traits_html = render_v2_list(species_entries, 10, sheet_id, "species") or '<p class="muted">No ancestry traits exported.</p>'
+    feats_html = render_v2_list(feat_entries, 10, sheet_id, "feats") or '<p class="muted">No feats exported.</p>'
 
     armor_labels = {"Light Armor", "Medium Armor", "Heavy Armor", "Shields"}
     weapon_profs = [prof for prof in data["proficiencies"] if prof not in armor_labels]
@@ -3484,7 +3720,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       padding-bottom: 12px;
       border-bottom: 1px solid var(--rule-soft);
     }
-    .dnd-layout-page-head > div:first-of-type { padding: 18px 0 0 22px; }
+    .dnd-layout-page-head > div:first-of-type { padding: 2px 0 0 4px; }
     .dnd-layout-attribution {
       position: absolute;
       top: 2px;
@@ -3746,7 +3982,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       border-radius: calc(var(--radius) - 6px);
       background: rgba(255,255,255,0.22);
       padding: 10px;
-      box-shadow: inset 3px 0 0 var(--accent);
+      box-shadow: inset 1px 0 0 var(--accent);
     }
     .ability-heading {
       display: flex;
@@ -3760,7 +3996,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       letter-spacing: 0.16em;
       text-transform: uppercase;
       color: var(--ink);
-      font-weight: 600;
+      font-weight: 700;
       text-align: center;
     }
     .ability-core {
@@ -3967,6 +4203,43 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       outline-offset: 2px;
     }
     .no-pips { color: var(--ink-soft); }
+    .feature-uses {
+      display: inline-flex;
+      gap: 3px;
+      align-items: center;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .feature-uses .slot-pip { width: 12px; height: 12px; }
+    .feature-uses .slot-pip span { width: 7px; height: 7px; border-width: 1px; }
+    .feature-pool {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 3px;
+      margin-left: 6px;
+      vertical-align: middle;
+      font-variant-numeric: tabular-nums;
+    }
+    .feature-pool-input {
+      width: 2.4rem;
+      padding: 0 2px;
+      border: 0;
+      border-bottom: 1px solid var(--rule-soft);
+      background: transparent;
+      color: var(--ink);
+      text-align: right;
+      font: inherit;
+      outline: none;
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+    .feature-pool-input::-webkit-inner-spin-button,
+    .feature-pool-input::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .feature-pool-input:focus { border-bottom-color: var(--accent); }
+    .feature-pool-sep, .feature-pool-max { color: var(--ink-soft); font-size: 0.92em; }
     .dnd-layout-table {
       width: 100%;
       border-collapse: collapse;

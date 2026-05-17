@@ -4,7 +4,7 @@
 
 Current support is for Foundry's `dnd5e` system, including D&D 2024-style character data. It is character-agnostic within that system: if you feed it a different `dnd5e` actor export, it should generate a sheet for that character too.
 
-Current release: `v0.1.0`
+Current release: `v0.2.0`
 
 ## Themes
 

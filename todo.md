@@ -37,12 +37,15 @@
 - [x] Added `--paper a4|letter` so PDF/print output can target US Letter in addition to the default A4 profile.
 - [x] Added a clearer `--print-browser` PDF export option and smoke coverage for browser autodetection fallbacks.
 - [x] Gave ability stats more visual emphasis with boxed ability abbreviations/scores and an accent rail.
+- [x] Thinned the vertical accent rail on each ability card so it matches the 1px separators used elsewhere on the sheet.
+- [x] Bolded the written-out ability names (Strength, Dexterity, Constitution, Intelligence, Wisdom, Charisma).
+- [x] Made class-feature usage trackers semantic. Clickable diamond pips now render only for whitelisted spendable D&D resources (Channel Divinity, Wild Shape, Bardic Inspiration, Rage, Second Wind, Action Surge, Ki/Focus, Lay on Hands, Divine Sense, Sorcery Points, Mystic Arcanum, Lucky, Healing Light, Tomb of Levistus, Arcane Recovery, Breath Weapon, Relentless Endurance, etc.). Misleading "uses N" text on passive/source-granted features (Spellcasting, domain spell lists, Magic Initiate, racial traits like Trance / Elven Lineage) is suppressed.
+- [x] Tightened the HTML page-title padding so the title hugs the decorative corner bracket the way the PDF already does.
+- [x] Resolved Foundry formula `uses.max` values (`@prof`, `@abilities.X.mod`, `@scale.<class>.<feature>`, plus arithmetic and `max`/`min`/`floor`/`ceil`/`round`/`abs`) via a small safe AST evaluator. Action Surge now resolves through the class ScaleValue advancement and Bardic Inspiration (d8) resolves through the Cha modifier, so both get the right pip counts.
+- [x] Collapsed scaling-die feat variants (e.g. `bardic-inspiration` + `bardic-inspiration-d8`) so the sheet only shows the variant matching the character's current level. The kept variant takes the position of the base entry to avoid being pushed past the panel's truncation cap.
+- [x] Added a per-resource render override (`POOL_RESOURCE_IDS`) so pool-style resources like Lay on Hands (hp pool) and Healing Light (d6 pool) render as a small `current / max` numeric input instead of a long row of pips. New resources can be added to the set as they come up.
 
 ## Open
-
-- [ ] Make class-feature usage trackers semantic instead of trusting every Foundry `uses` field. Add clickable boxes only for genuinely spendable D&D resources such as Channel Divinity, Wild Shape, Bardic Inspiration, Rage, Second Wind, Action Surge, Focus/Ki points, Lay on Hands, Divine Sense, Sorcery Points, and similar class/subclass resources. Suppress misleading `uses 1` text for passive/source-granted features such as Spellcasting, domain spell lists, Magic Initiate, and ancestry traits.
 - [ ] Add a small plug-and-play interface so users can pick the actor JSON file, style/theme, and output mode, then run generation without using the CLI.
 - [ ] In that interface, show a visual preview for each style/theme so users can see what `ledger`, `codex`, `mono`, etc. look like before generating.
 - [ ] Validate PDF export on real macOS and Windows machines.
-- [ ] Change the thick vertical bar next to each stat (DEX, Con, ETC). It is too visually distracting. use the same thickness as the separating bars on inspiration, speed, etc.
-- [ ] bold each stat that is written out (Strength, Charisma, Constition,etc...) 
