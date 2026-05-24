@@ -5640,7 +5640,7 @@ def parse_theme_arg(value: str) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("actor_json", type=Path, help="Path to the exported Foundry actor JSON file")
+    parser.add_argument("actor_json", nargs="?", type=Path, help="Path to the exported Foundry actor JSON file (omit when using --serve)")
     parser.add_argument("--output-dir", type=Path, default=Path("output"), help="Where to write generated files")
     parser.add_argument("--mode", choices=list(MODE_CHOICES), help="Initial color mode for the generated HTML/PDF (light, dark, or mono)")
     parser.add_argument("--paper", choices=list(PAPER_PROFILES), default="a4", help="Print/PDF paper profile (default: a4)")
@@ -5658,12 +5658,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chromium", help="Explicit Chromium executable path")
     parser.add_argument("--print-browser", dest="chromium", help="Explicit Chromium-compatible browser path for PDF export")
     parser.add_argument("--no-footer", action="store_true", help="Do not include the attribution/disclaimer footer")
+    parser.add_argument("--serve", action="store_true", help="Launch the local web UI in your browser instead of generating from the CLI")
+    parser.add_argument("--port", type=int, default=8765, help="Port for --serve (default: 8765)")
+    parser.add_argument("--no-browser", action="store_true", help="With --serve, do not auto-open the browser")
     parser.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.serve and args.actor_json is None:
+        parser.error("actor_json is required (or pass --serve to launch the web UI)")
+    return args
 
 
 def main() -> int:
     args = parse_args()
+    if args.serve:
+        import webui
+        return webui.run(port=args.port, output_dir=args.output_dir, open_browser=not args.no_browser)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     html_paths = write_output(
         args.actor_json,

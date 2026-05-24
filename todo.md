@@ -45,7 +45,8 @@
 - [x] Collapsed scaling-die feat variants (e.g. `bardic-inspiration` + `bardic-inspiration-d8`) so the sheet only shows the variant matching the character's current level. The kept variant takes the position of the base entry to avoid being pushed past the panel's truncation cap.
 - [x] Added a per-resource render override (`POOL_RESOURCE_IDS`) so pool-style resources like Lay on Hands (hp pool) and Healing Light (d6 pool) render as a small `current / max` numeric input instead of a long row of pips. New resources can be added to the set as they come up.
 
+- [x] Added a local web UI (`--serve`, `webui.py`): drop or browse an actor JSON, see a live per-theme preview gallery, pick color mode / paper / footer, then download the HTML (and PDF if a browser is present). Bound to `127.0.0.1`; character data stays local. Reuses the generator's render/PDF functions and is covered by `tests/test_webui.py`.
+
 ## Open
-- [ ] Add a small plug-and-play interface so users can pick the actor JSON file, style/theme, and output mode, then run generation without using the CLI.
-- [ ] In that interface, show a visual preview for each style/theme so users can see what `ledger`, `codex`, `mono`, etc. look like before generating.
+- [ ] Package the web UI as a double-click desktop app (frozen binary via PyInstaller, built per-OS in GitHub Actions) so users without Python installed can run it. Build-time tooling only — the generator runtime stays standard-library-only.
 - [ ] Validate PDF export on real macOS and Windows machines.
