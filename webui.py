@@ -426,9 +426,12 @@ _PAGE = r"""<!doctype html>
   .preview-pane { flex: 1; overflow: auto; display: flex; justify-content: center;
                   align-items: flex-start; padding: 24px; }
   .empty { color: var(--ink-soft); margin: auto; text-align: center; font-size: 14px; }
-  .preview-frame { width: 820px; max-width: 100%; min-height: 600px; border: 0;
-                   background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.14); border-radius: 6px; }
-  .preview-frame[hidden] { display: none; }
+  /* The sheet keeps its two-column layout above 960px (it collapses to one
+     column below that), so the preview is rendered wide and scaled to fit. */
+  .preview-stage { position: relative; }
+  .preview-stage[hidden] { display: none; }
+  .preview-frame { transform-origin: top left; border: 0; background: #fff;
+                   box-shadow: 0 10px 40px rgba(0,0,0,.14); border-radius: 6px; }
   .loading { position: fixed; top: 14px; right: 18px; background: var(--ink); color: #fff;
              padding: 6px 12px; border-radius: 20px; font-size: 12px; opacity: 0; transition: opacity .15s; }
   .loading.show { opacity: .9; }
@@ -493,7 +496,9 @@ _PAGE = r"""<!doctype html>
 
   <main class="preview-pane">
     <div class="empty" id="empty">Upload a Foundry actor JSON to preview themes.</div>
-    <iframe class="preview-frame" id="preview" title="Sheet preview" hidden></iframe>
+    <div class="preview-stage" id="stage" hidden>
+      <iframe class="preview-frame" id="preview" title="Sheet preview"></iframe>
+    </div>
   </main>
 </div>
 <div class="loading" id="loading">Rendering…</div>
@@ -572,20 +577,33 @@ function selectTheme(name) {
   showPreview();
 }
 
+// Render the sheet at a width that keeps its two-column layout (breakpoint is
+// 960px), then scale the same-origin iframe down to fit the pane — readable and
+// matching the CLI HTML, without horizontal scrolling.
+const PREVIEW_WIDTH = 1080;
+
+function fitPreview() {
+  const stage = $("stage");
+  if (stage.hidden) return;
+  const frame = $("preview");
+  const avail = document.querySelector(".preview-pane").clientWidth - 48;
+  const scale = Math.min(1, avail / PREVIEW_WIDTH);
+  let h = 1400;
+  try { h = frame.contentWindow.document.documentElement.scrollHeight; } catch (e) {}
+  frame.style.width = PREVIEW_WIDTH + "px";
+  frame.style.height = h + "px";
+  frame.style.transform = "scale(" + scale + ")";
+  stage.style.width = (PREVIEW_WIDTH * scale) + "px";
+  stage.style.height = (h * scale) + "px";
+}
+
 function showPreview() {
   if (!state.theme) return;
   const frame = $("preview");
   setLoading(true);
-  frame.onload = () => {
-    setLoading(false);
-    // Same-origin iframe → size it to its content so the pane scrolls naturally.
-    try {
-      const doc = frame.contentWindow.document;
-      frame.style.height = doc.documentElement.scrollHeight + "px";
-    } catch (e) { /* leave default height */ }
-  };
+  frame.onload = () => { setLoading(false); fitPreview(); };
   frame.src = previewSrc(state.theme);
-  frame.hidden = false;
+  $("stage").hidden = false;
   $("empty").hidden = true;
 }
 
@@ -645,6 +663,7 @@ $("opt-paper").onchange = (e) => { state.paper = e.target.value; if (state.ready
 $("opt-footer").onchange = (e) => { state.footer = e.target.checked; };
 $("btn-html").onclick = () => generate(false);
 $("btn-pdf").onclick = () => generate(true);
+window.addEventListener("resize", fitPreview);
 </script>
 </body>
 </html>
