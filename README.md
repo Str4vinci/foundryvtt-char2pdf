@@ -6,6 +6,40 @@ Current support is for Foundry's `dnd5e` system, including D&D 2024-style charac
 
 Current release: `v0.3.0`
 
+## Screenshots
+
+The same character — `Xano`, a level 3 Life Domain Cleric — rendered by the generator. Every sheet keeps a two-column, print-ready layout and ships with an in-browser `light` / `dark` / `mono` toggle.
+
+<p align="center">
+  <img src="docs/screenshots/sheet-cleric-light.png" alt="Xano character sheet rendered in the cleric theme, light mode" width="820"><br>
+  <sub>Auto-selected class theme (Cleric) · light</sub>
+</p>
+
+A few of the built-in themes and color modes:
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/sheet-cleric-dark.png" alt="Cleric theme in dark mode" width="100%"><br>
+      <sub>Class theme · dark</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/sheet-dracula-dark.png" alt="Dracula curated palette in dark mode" width="100%"><br>
+      <sub>Dracula palette · dark</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/sheet-solarized-light.png" alt="Solarized curated palette in light mode" width="100%"><br>
+      <sub>Solarized palette · light</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/sheet-cleric-mono.png" alt="Mono mode tuned for grayscale printing" width="100%"><br>
+      <sub>Mono · tuned for grayscale printing</sub>
+    </td>
+  </tr>
+</table>
+
 ## Themes
 
 By default the generator picks a theme based on the actor's primary class. You can override with `--theme NAME` or pass a custom `#RRGGBB` accent.
@@ -53,6 +87,11 @@ Every generated HTML sheet also includes an in-browser theme toggle that cycles 
 HTML generation works with vanilla Python alone. PDF generation additionally requires a local Chromium-compatible browser. The generator looks for common Linux commands plus standard macOS and Windows Chrome/Edge install paths. If autodetection does not find your browser, pass it explicitly with `--print-browser /path/to/browser` or the legacy `--chromium /path/to/browser`. CI checks the minimum supported Python version, currently Python 3.10.
 
 ## Graphical interface (no command line)
+
+<p align="center">
+  <img src="docs/screenshots/web-ui.png" alt="The char2pdf local web UI with a sidebar of themes and a live sheet preview" width="900"><br>
+  <sub>The local web UI — pick a theme from the sidebar and see a live preview before downloading</sub>
+</p>
 
 If you would rather not use the terminal, launch the built-in web UI:
 
