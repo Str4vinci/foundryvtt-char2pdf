@@ -187,13 +187,11 @@ python3 -m unittest discover -s tests
 
 Planned or wanted directions for the project. Contributions in any of these areas are welcome.
 
-- **Cross-platform parity.** Make browser detection and PDF export work out of the box on Linux, macOS, and Windows without per-OS manual setup.
-- **Semantic D&D resource trackers.** Foundry's `uses` data is not always a player-spendable resource. Trackers should appear for real limited-use class/subclass resources, such as Channel Divinity, Wild Shape, Bardic Inspiration, Rage, Second Wind, Action Surge, Focus/Ki points, Lay on Hands, Divine Sense, and Sorcery Points, while passive/source-granted features stay plain text.
-- **More curated palettes.** Solarized, Everforest, Gruvbox, Tokyo Night, One Dark, Catppuccin Latte, Rosé Pine (+ Dawn), and Kanagawa now ship. Further popular schemes (Gruvbox Light, Ayu, Material, etc.) and more dedicated daytime light themes are still welcome.
-- **More tabletop RPG systems.** Today the renderer only understands Foundry's `dnd5e` actor schema. Adding adapters for other systems (Pathfinder 2e, Call of Cthulhu, Shadowdark, etc.) would make the project useful beyond D&D.
-- **Plug-and-play UI.** Shipped as a local web UI (`--serve`) — pick the actor JSON, theme, and output mode without touching the CLI. The remaining piece is a double-click desktop build (a frozen binary via PyInstaller, distributed per-OS) so users without Python installed can run it.
-- **Theme preview gallery.** Shipped — the web UI renders a live preview of every theme before generating.
-- **Per-system print tuning.** The generator supports A4 and Letter paper profiles today; future work should tune page density and content priorities per game system.
+- **Double-click desktop app.** The web UI already ships (`--serve`, with live theme previews); the remaining piece is a frozen binary (PyInstaller, distributed per-OS) so users without Python installed can run it by double-clicking. Build-time tooling only — the generator runtime stays standard-library-only.
+- **Cross-platform PDF parity.** Make browser detection and PDF export work out of the box on Linux, macOS, and Windows without per-OS manual setup.
+- **More curated palettes.** Building on the shipped set (Solarized, Gruvbox, Tokyo Night, Kanagawa, …), add further popular schemes (Gruvbox Light, Ayu, Material, etc.) and more dedicated daytime light themes.
+- **More tabletop RPG systems.** Today the renderer only understands Foundry's `dnd5e` actor schema. Adapters for other systems (Pathfinder 2e, Call of Cthulhu, Shadowdark, etc.) behind a clear adapter boundary would make the project useful beyond D&D.
+- **Per-system print tuning.** A4 and US Letter profiles already ship; future work should tune page density and content priorities per game system.
 
 ## Contributing
 
