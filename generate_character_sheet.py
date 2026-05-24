@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 APP_STORAGE_VERSION = APP_VERSION.replace(".", "-")
 
 ABILITY_ORDER = ["str", "dex", "con", "int", "wis", "cha"]
@@ -2332,6 +2332,34 @@ THEMES: dict[str, dict] = {
     "hearth":     {"base": "ledger", "decoration": "hearth",
                    "light_accent": "#cc785c", "light_accent_strong": "#915641",
                    "dark_accent":  "#e8a487", "dark_accent_strong":  "#d4836a"},
+    # Popular editor/designer palettes — ledger baseline + bespoke typography + body decoration
+    "solarized":        {"base": "ledger", "decoration": "solarized",
+                         "light_accent": "#268bd2", "light_accent_strong": "#2aa198",
+                         "dark_accent":  "#2aa198", "dark_accent_strong":  "#b58900"},
+    "everforest":       {"base": "ledger", "decoration": "everforest",
+                         "light_accent": "#8da101", "light_accent_strong": "#f57d26",
+                         "dark_accent":  "#a7c080", "dark_accent_strong":  "#83c092"},
+    "gruvbox":          {"base": "ledger", "decoration": "gruvbox",
+                         "light_accent": "#af3a03", "light_accent_strong": "#b57614",
+                         "dark_accent":  "#fabd2f", "dark_accent_strong":  "#fe8019"},
+    "tokyo-night":      {"base": "ledger", "decoration": "tokyo-night",
+                         "light_accent": "#2e7de9", "light_accent_strong": "#9854f1",
+                         "dark_accent":  "#7aa2f7", "dark_accent_strong":  "#bb9af7"},
+    "one-dark":         {"base": "ledger", "decoration": "one-dark",
+                         "light_accent": "#4078f2", "light_accent_strong": "#a626a4",
+                         "dark_accent":  "#61afef", "dark_accent_strong":  "#c678dd"},
+    "catppuccin-latte": {"base": "ledger", "decoration": "catppuccin-latte",
+                         "light_accent": "#8839ef", "light_accent_strong": "#1e66f5",
+                         "dark_accent":  "#7287fd", "dark_accent_strong":  "#209fb5"},
+    "rose-pine":        {"base": "ledger", "decoration": "rose-pine",
+                         "light_accent": "#31748f", "light_accent_strong": "#b4637a",
+                         "dark_accent":  "#c4a7e7", "dark_accent_strong":  "#9ccfd8"},
+    "rose-pine-dawn":   {"base": "ledger", "decoration": "rose-pine-dawn",
+                         "light_accent": "#286983", "light_accent_strong": "#b4637a",
+                         "dark_accent":  "#907aa9", "dark_accent_strong":  "#d7827e"},
+    "kanagawa":         {"base": "ledger", "decoration": "kanagawa",
+                         "light_accent": "#4d699b", "light_accent_strong": "#c84053",
+                         "dark_accent":  "#7e9cd8", "dark_accent_strong":  "#98bb6c"},
     # Class themes — ledger baseline + class accent
     **{name: _class_theme_entry(accent) for name, accent in CLASS_THEME_COLORS.items()},
 }
@@ -3097,6 +3125,266 @@ def _sheet_palette_css(palette: str | None) -> str:
           font-family: var(--display);
           letter-spacing: 0.14em;
           text-transform: uppercase;
+        }
+        """
+    if palette == "solarized":
+        return r"""
+        body.dnd-layout-palette-solarized {
+          --serif: "Source Serif 4", "Source Serif Pro", "Georgia", serif;
+          --display: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+          --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+          background:
+            radial-gradient(circle at 16% 12%, rgba(38, 139, 210, 0.10), transparent 32%),
+            radial-gradient(circle at 84% 20%, rgba(42, 161, 152, 0.08), transparent 30%),
+            linear-gradient(180deg, rgba(238, 232, 213, 0.60), transparent 240px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-solarized .dnd-layout-page-title,
+        body.dnd-layout-palette-solarized .dnd-layout-section-title,
+        body.dnd-layout-palette-solarized .dnd-layout-label,
+        body.dnd-layout-palette-solarized .dnd-layout-token,
+        body.dnd-layout-palette-solarized .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-solarized .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-solarized button {
+          font-family: var(--display);
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-solarized .dnd-layout-page,
+        body.dnd-layout-palette-solarized .dnd-layout-panel {
+          border-color: rgba(38, 139, 210, 0.20);
+        }
+        """
+    if palette == "everforest":
+        return r"""
+        body.dnd-layout-palette-everforest {
+          --serif: "Bitter", "Source Serif 4", "Georgia", serif;
+          --display: "Quicksand", "Comfortaa", "Avenir Next", sans-serif;
+          --sans: "Mulish", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 14% 10%, rgba(141, 161, 1, 0.12), transparent 34%),
+            radial-gradient(circle at 86% 84%, rgba(245, 125, 38, 0.07), transparent 38%),
+            linear-gradient(180deg, rgba(239, 235, 212, 0.60), transparent 240px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-everforest .dnd-layout-page-title,
+        body.dnd-layout-palette-everforest .dnd-layout-section-title,
+        body.dnd-layout-palette-everforest .dnd-layout-label,
+        body.dnd-layout-palette-everforest .dnd-layout-token,
+        body.dnd-layout-palette-everforest .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-everforest .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-everforest button {
+          font-family: var(--display);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        """
+    if palette == "gruvbox":
+        return r"""
+        body.dnd-layout-palette-gruvbox {
+          --serif: "Zilla Slab", "Roboto Slab", "Rockwell", "Georgia", serif;
+          --display: "Zilla Slab", "Roboto Slab", "Rockwell", serif;
+          --sans: "Work Sans", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 16% 12%, rgba(215, 153, 33, 0.14), transparent 34%),
+            radial-gradient(circle at 84% 86%, rgba(214, 93, 14, 0.08), transparent 40%),
+            linear-gradient(180deg, rgba(242, 229, 188, 0.70), transparent 240px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-gruvbox .dnd-layout-page-title,
+        body.dnd-layout-palette-gruvbox .dnd-layout-section-title,
+        body.dnd-layout-palette-gruvbox .dnd-layout-label,
+        body.dnd-layout-palette-gruvbox .dnd-layout-token,
+        body.dnd-layout-palette-gruvbox .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-gruvbox .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-gruvbox button {
+          font-family: var(--display);
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-gruvbox .dnd-layout-panel::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(215, 153, 33, 0.07), transparent 44%);
+          pointer-events: none;
+        }
+        """
+    if palette == "tokyo-night":
+        return r"""
+        body.dnd-layout-palette-tokyo-night {
+          --serif: "Spectral", "Source Serif 4", "Georgia", serif;
+          --display: "Chakra Petch", "Space Grotesk", "Helvetica Neue", sans-serif;
+          --sans: "Inter", "Segoe UI", sans-serif;
+          background:
+            radial-gradient(circle at 16% 10%, rgba(46, 125, 233, 0.10), transparent 34%),
+            radial-gradient(circle at 82% 22%, rgba(152, 84, 241, 0.08), transparent 30%),
+            radial-gradient(circle at 80% 84%, rgba(0, 113, 151, 0.06), transparent 34%),
+            linear-gradient(180deg, rgba(225, 226, 231, 0.50), transparent 220px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-tokyo-night .dnd-layout-page-title,
+        body.dnd-layout-palette-tokyo-night .dnd-layout-section-title,
+        body.dnd-layout-palette-tokyo-night .dnd-layout-label,
+        body.dnd-layout-palette-tokyo-night .dnd-layout-token,
+        body.dnd-layout-palette-tokyo-night .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-tokyo-night .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-tokyo-night button {
+          font-family: var(--display);
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-tokyo-night .dnd-layout-page { backdrop-filter: blur(3px); }
+        body.dnd-layout-palette-tokyo-night .dnd-layout-panel::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(152, 84, 241, 0.07), transparent 42%);
+          pointer-events: none;
+        }
+        """
+    if palette == "one-dark":
+        return r"""
+        body.dnd-layout-palette-one-dark {
+          --serif: "Newsreader", "Source Serif 4", "Georgia", serif;
+          --display: "Manrope", "Inter", "Helvetica Neue", sans-serif;
+          --sans: "Inter", "Segoe UI", sans-serif;
+          background:
+            radial-gradient(circle at 16% 12%, rgba(64, 120, 242, 0.09), transparent 32%),
+            radial-gradient(circle at 84% 84%, rgba(166, 38, 164, 0.06), transparent 34%),
+            linear-gradient(180deg, rgba(236, 238, 242, 0.55), transparent 220px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-one-dark .dnd-layout-page-title,
+        body.dnd-layout-palette-one-dark .dnd-layout-section-title,
+        body.dnd-layout-palette-one-dark .dnd-layout-label,
+        body.dnd-layout-palette-one-dark .dnd-layout-token,
+        body.dnd-layout-palette-one-dark .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-one-dark .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-one-dark button {
+          font-family: var(--display);
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
+        """
+    if palette == "catppuccin-latte":
+        return r"""
+        body.dnd-layout-palette-catppuccin-latte {
+          --serif: "Fraunces", "Source Serif 4", "Georgia", serif;
+          --display: "Comfortaa", "Quicksand", "Avenir Next", sans-serif;
+          --sans: "Nunito Sans", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 18% 14%, rgba(136, 57, 239, 0.06), transparent 30%),
+            radial-gradient(circle at 82% 84%, rgba(30, 102, 245, 0.05), transparent 30%),
+            linear-gradient(180deg, rgba(230, 233, 239, 0.70), transparent 200px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-catppuccin-latte .dnd-layout-page-title,
+        body.dnd-layout-palette-catppuccin-latte .dnd-layout-section-title,
+        body.dnd-layout-palette-catppuccin-latte .dnd-layout-label,
+        body.dnd-layout-palette-catppuccin-latte .dnd-layout-token,
+        body.dnd-layout-palette-catppuccin-latte .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-catppuccin-latte .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-catppuccin-latte button {
+          font-family: var(--display);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-catppuccin-latte .dnd-layout-panel::before,
+        body.dnd-layout-palette-catppuccin-latte .dnd-layout-summary-card::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(136, 57, 239, 0.05), rgba(255, 255, 255, 0.02) 18%, transparent 34%);
+          pointer-events: none;
+        }
+        """
+    if palette == "rose-pine":
+        return r"""
+        body.dnd-layout-palette-rose-pine {
+          --serif: "Cormorant Garamond", "EB Garamond", "Georgia", serif;
+          --display: "Marcellus", "Cormorant Garamond", "Georgia", serif;
+          --sans: "Jost", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 16% 10%, rgba(196, 167, 231, 0.12), transparent 34%),
+            radial-gradient(circle at 84% 22%, rgba(235, 188, 186, 0.10), transparent 30%),
+            radial-gradient(circle at 80% 86%, rgba(49, 116, 143, 0.06), transparent 34%),
+            linear-gradient(180deg, rgba(242, 233, 234, 0.50), transparent 220px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-rose-pine .dnd-layout-page-title,
+        body.dnd-layout-palette-rose-pine .dnd-layout-section-title,
+        body.dnd-layout-palette-rose-pine .dnd-layout-label,
+        body.dnd-layout-palette-rose-pine .dnd-layout-token,
+        body.dnd-layout-palette-rose-pine .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-rose-pine .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-rose-pine button {
+          font-family: var(--display);
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-rose-pine .dnd-layout-panel::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(196, 167, 231, 0.08), transparent 44%);
+          pointer-events: none;
+        }
+        """
+    if palette == "rose-pine-dawn":
+        return r"""
+        body.dnd-layout-palette-rose-pine-dawn {
+          --serif: "EB Garamond", "Cormorant Garamond", "Georgia", serif;
+          --display: "Cormorant Garamond", "EB Garamond", "Georgia", serif;
+          --sans: "Jost", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 88% 8%, rgba(215, 130, 126, 0.12), transparent 38%),
+            radial-gradient(circle at 12% 90%, rgba(40, 105, 131, 0.06), transparent 42%),
+            linear-gradient(180deg, rgba(255, 250, 243, 0.70), transparent 240px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-page-title,
+        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-section-title,
+        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-label,
+        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-token,
+        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-rose-pine-dawn button {
+          font-family: var(--display);
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+        }
+        """
+    if palette == "kanagawa":
+        return r"""
+        body.dnd-layout-palette-kanagawa {
+          --serif: "Shippori Mincho", "Zen Old Mincho", "Source Serif 4", "Georgia", serif;
+          --display: "Zen Old Mincho", "Shippori Mincho", "Georgia", serif;
+          --sans: "Zen Kaku Gothic New", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 16% 12%, rgba(126, 156, 216, 0.16), transparent 36%),
+            radial-gradient(circle at 84% 20%, rgba(106, 149, 137, 0.10), transparent 30%),
+            radial-gradient(circle at 80% 86%, rgba(220, 165, 97, 0.07), transparent 34%),
+            linear-gradient(180deg, rgba(220, 215, 186, 0.40), transparent 240px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-kanagawa .dnd-layout-page-title,
+        body.dnd-layout-palette-kanagawa .dnd-layout-section-title,
+        body.dnd-layout-palette-kanagawa .dnd-layout-label,
+        body.dnd-layout-palette-kanagawa .dnd-layout-token,
+        body.dnd-layout-palette-kanagawa .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-kanagawa .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-kanagawa button {
+          font-family: var(--display);
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-kanagawa .dnd-layout-panel::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(126, 156, 216, 0.10), transparent 46%);
+          pointer-events: none;
         }
         """
     return ""
@@ -5352,7 +5640,7 @@ def parse_theme_arg(value: str) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("actor_json", type=Path, help="Path to the exported Foundry actor JSON file")
+    parser.add_argument("actor_json", nargs="?", type=Path, help="Path to the exported Foundry actor JSON file (omit when using --serve)")
     parser.add_argument("--output-dir", type=Path, default=Path("output"), help="Where to write generated files")
     parser.add_argument("--mode", choices=list(MODE_CHOICES), help="Initial color mode for the generated HTML/PDF (light, dark, or mono)")
     parser.add_argument("--paper", choices=list(PAPER_PROFILES), default="a4", help="Print/PDF paper profile (default: a4)")
@@ -5370,12 +5658,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chromium", help="Explicit Chromium executable path")
     parser.add_argument("--print-browser", dest="chromium", help="Explicit Chromium-compatible browser path for PDF export")
     parser.add_argument("--no-footer", action="store_true", help="Do not include the attribution/disclaimer footer")
+    parser.add_argument("--serve", action="store_true", help="Launch the local web UI in your browser instead of generating from the CLI")
+    parser.add_argument("--port", type=int, default=8765, help="Port for --serve (default: 8765)")
+    parser.add_argument("--no-browser", action="store_true", help="With --serve, do not auto-open the browser")
     parser.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.serve and args.actor_json is None:
+        parser.error("actor_json is required (or pass --serve to launch the web UI)")
+    return args
 
 
 def main() -> int:
     args = parse_args()
+    if args.serve:
+        import webui
+        return webui.run(port=args.port, output_dir=args.output_dir, open_browser=not args.no_browser)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     html_paths = write_output(
         args.actor_json,
