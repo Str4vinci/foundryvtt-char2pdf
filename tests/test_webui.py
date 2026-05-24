@@ -50,6 +50,8 @@ class HelperTests(unittest.TestCase):
         html = webui.render_preview("nord", "dark")
         self.assertIn("<!doctype html>", html)
         self.assertIn("sheet-palette-nord", html)
+        self.assertIn('initialTheme = "dark"', html)  # dark mode baked in
+        self.assertIn(".sheet-toolbar{display:none", html)  # toolbar hidden in preview
 
     def test_render_preview_without_actor_raises(self) -> None:
         with self.assertRaises(ValueError):
@@ -120,9 +122,12 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body)["default_theme"], "cleric")
 
-        status, headers, body = self._req("GET", "/preview?theme=kanagawa&mode=dark")
+        # `palette` selects the theme; `theme` carries the color mode (so the
+        # sheet's own ?theme override applies it). They must not collide.
+        status, headers, body = self._req("GET", "/preview?palette=kanagawa&theme=dark")
         self.assertEqual(status, 200)
         self.assertIn(b"sheet-palette-kanagawa", body)
+        self.assertIn(b'initialTheme = "dark"', body)
 
         status, _, body = self._req("POST", "/generate",
                                     json.dumps({"theme": "kanagawa", "paper": "letter",

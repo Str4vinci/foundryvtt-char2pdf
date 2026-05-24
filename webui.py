@@ -1,9 +1,9 @@
 """Local web UI for foundryvtt-char2pdf.
 
 Stdlib-only. Binds to 127.0.0.1, opens the browser, and lets a user pick a
-Foundry actor JSON, preview every theme live, and generate an HTML sheet (and a
-PDF if a Chromium-compatible browser is present) — no terminal needed after the
-app is launched.
+Foundry actor JSON, preview themes live (one large, readable sheet at a time),
+and generate an HTML sheet (and a PDF if a Chromium-compatible browser is
+present) — no terminal needed after the app is launched.
 
 Launch with `python3 generate_character_sheet.py --serve` or `python3 webui.py`.
 The actor JSON is read in the browser and POSTed as raw JSON, so the server
@@ -24,6 +24,9 @@ import generate_character_sheet as gen
 
 # Where generated files are written. Configured by run(); used by the HTTP path.
 OUTPUT_DIR = Path("output")
+
+# Themes that are layouts in their own right (no curated decoration, not a class).
+_LAYOUT_THEMES = {"ledger", "gazette", "grimoire"}
 
 
 # --------------------------------------------------------------------------- #
@@ -61,16 +64,22 @@ def load_actor(actor: dict) -> dict:
 
 
 def theme_list() -> list[dict]:
-    """Theme names + accent swatches for building the gallery cards."""
-    return [
-        {
+    """Theme names + accent swatches + group for the sidebar list."""
+    out = []
+    for name, entry in gen.THEMES.items():
+        if name in _LAYOUT_THEMES:
+            group = "Layouts"
+        elif entry.get("decoration"):
+            group = "Curated palettes"
+        else:
+            group = "Class themes"
+        out.append({
             "name": name,
             "light_accent": entry["light_accent"],
             "dark_accent": entry["dark_accent"],
-            "base": entry["base"],
-        }
-        for name, entry in gen.THEMES.items()
-    ]
+            "group": group,
+        })
+    return out
 
 
 def _palette(entry: dict) -> dict:
@@ -86,11 +95,17 @@ def _resolve(theme: str) -> tuple[str, dict]:
 
 
 def render_preview(theme: str, mode: str | None, paper: str = "a4") -> str:
-    """Full sheet HTML for the current actor in `theme` (for an iframe)."""
+    """Full sheet HTML for the current actor in `theme` (for the preview iframe).
+
+    The in-sheet toolbar is hidden so the preview shows just the sheet. The
+    color mode is applied two ways: baked in here as the initial theme, and
+    (authoritatively) via the iframe's `?theme=<mode>` query, which the sheet's
+    own script honors as an override.
+    """
     if STATE.context is None:
         raise ValueError("No actor loaded.")
     _, entry = _resolve(theme)
-    return gen.render_character_sheet(
+    html = gen.render_character_sheet(
         STATE.context,
         STATE.sheet_id,
         style=entry["base"],
@@ -98,6 +113,11 @@ def render_preview(theme: str, mode: str | None, paper: str = "a4") -> str:
         theme_palette=_palette(entry),
         palette_decoration=entry.get("decoration"),
         paper=paper,
+    )
+    return html.replace(
+        "</head>",
+        "<style>.sheet-toolbar{display:none !important;}</style></head>",
+        1,
     )
 
 
@@ -192,12 +212,14 @@ class Handler(BaseHTTPRequestHandler):
         if STATE.context is None:
             self._err(HTTPStatus.BAD_REQUEST, "Upload an actor first.")
             return
-        theme = (query.get("theme") or ["ledger"])[0]
-        mode = (query.get("mode") or [None])[0]
+        # `palette` = which theme to render; `theme` = color mode (so the sheet's
+        # own ?theme override applies it). They are deliberately separate params.
+        theme = (query.get("palette") or ["ledger"])[0]
+        mode = (query.get("theme") or ["light"])[0]
         paper = (query.get("paper") or ["a4"])[0]
         if paper not in gen.PAPER_PROFILES:
             paper = "a4"
-        if mode is not None and mode not in gen.MODE_CHOICES:
+        if mode not in gen.MODE_CHOICES:
             mode = None
         try:
             html = render_preview(theme, mode, paper)
@@ -319,123 +341,129 @@ _PAGE = r"""<!doctype html>
 <title>char2pdf · character sheet generator</title>
 <style>
   :root {
-    --ink: #1b1d22; --ink-soft: #5c616b; --line: #e3e0d8; --paper: #f7f5f0;
-    --card: #ffffff; --accent: #7a1518; --radius: 12px;
+    --ink: #1b1d22; --ink-soft: #5c616b; --line: #e3e0d8; --bg: #ece9e2;
+    --panel: #f7f5f0; --card: #fff; --accent: #7a1518; --radius: 10px;
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
   body {
-    margin: 0; background: var(--paper); color: var(--ink);
-    font: 15px/1.5 "Inter", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink);
+    font: 14px/1.5 "Inter", "Segoe UI", system-ui, sans-serif;
   }
-  header.top {
-    padding: 22px 28px; border-bottom: 1px solid var(--line);
-    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
-  }
-  header.top h1 { margin: 0; font-size: 20px; letter-spacing: 0.02em; }
-  header.top .sub { color: var(--ink-soft); font-size: 13px; }
-  header.top .ver { margin-left: auto; color: var(--ink-soft); font-size: 12px; }
-  main { max-width: 1180px; margin: 0 auto; padding: 26px 28px 60px; }
+  .app { display: flex; height: 100vh; }
 
-  .banner { display: none; margin: 0 0 18px; padding: 11px 14px; border-radius: 8px;
-            background: #fdecea; color: #8a1c12; border: 1px solid #f3c9c4; }
+  /* ---- sidebar ---- */
+  .sidebar {
+    flex: 0 0 312px; width: 312px; background: var(--panel);
+    border-right: 1px solid var(--line); display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar > * { padding: 0 16px; }
+  .brand { padding-top: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .brand h1 { margin: 0; font-size: 17px; letter-spacing: 0.02em; }
+  .brand .sub { color: var(--ink-soft); font-size: 11.5px; }
+  .brand .ver { color: var(--ink-soft); font-size: 11px; float: right; }
+
+  .banner { display: none; margin: 12px 16px 0; padding: 9px 11px; border-radius: 8px;
+            background: #fdecea; color: #8a1c12; border: 1px solid #f3c9c4; font-size: 12.5px; }
   .banner.show { display: block; }
 
   #drop {
+    margin: 14px 16px 0; padding: 16px; text-align: center; cursor: pointer;
     border: 2px dashed #cbc7bd; border-radius: var(--radius); background: var(--card);
-    padding: 40px 24px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+    transition: border-color .15s, background .15s; font-size: 12.5px;
   }
   #drop:hover, #drop.hover { border-color: var(--accent); background: #fffdfb; }
-  #drop .big { font-size: 16px; font-weight: 600; }
-  #drop .small { color: var(--ink-soft); font-size: 13px; margin-top: 6px; }
+  #drop .big { font-weight: 600; font-size: 13px; }
+  #drop .small { color: var(--ink-soft); margin-top: 3px; }
 
-  #workspace[hidden] { display: none; }
-  .actor-bar {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    padding: 14px 16px; margin: 18px 0; background: var(--card);
-    border: 1px solid var(--line); border-radius: var(--radius);
-  }
-  .actor-bar .who { font-weight: 600; }
-  .actor-bar .cls { color: var(--ink-soft); font-size: 13px; }
-  .actor-bar .change { margin-left: auto; }
+  .actor { display: none; margin-top: 12px; }
+  .actor.show { display: block; }
+  .actor .who { font-weight: 600; font-size: 14px; }
+  .actor .cls { color: var(--ink-soft); font-size: 12px; }
+  .actor .change { margin-top: 4px; background: none; border: 0; color: var(--accent);
+                   font-size: 12px; cursor: pointer; padding: 0; text-decoration: underline; }
 
-  .options { display: flex; gap: 18px 22px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 18px; }
-  .field { display: flex; flex-direction: column; gap: 5px; }
-  .field label { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
-  select, button { font: inherit; }
-  select { padding: 7px 10px; border: 1px solid #cbc7bd; border-radius: 8px; background: #fff; }
-  .check { flex-direction: row; align-items: center; gap: 8px; }
-  .check input { width: 16px; height: 16px; }
+  .opts { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px 12px; }
+  .opts .full { grid-column: 1 / -1; }
+  .field label { display: block; font-size: 10.5px; color: var(--ink-soft);
+                 text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  select { width: 100%; padding: 6px 8px; border: 1px solid #cbc7bd; border-radius: 7px;
+           background: #fff; font: inherit; }
+  .check { display: flex; align-items: center; gap: 7px; }
+  .check input { width: 15px; height: 15px; }
+  .check label { font-size: 12.5px; color: var(--ink); }
 
-  .gallery {
-    display: grid; grid-template-columns: repeat(auto-fill, 300px);
-    gap: 18px; justify-content: center;
+  .list-head { margin-top: 14px; padding-bottom: 6px; font-size: 10.5px; color: var(--ink-soft);
+               text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--line); }
+  .theme-list { flex: 1; overflow-y: auto; padding: 4px 10px 12px; }
+  .theme-list .group { font-size: 10px; color: var(--ink-soft); text-transform: uppercase;
+                       letter-spacing: 0.07em; margin: 12px 6px 4px; }
+  .theme-row {
+    display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 8px;
+    border: 1px solid transparent; border-radius: 7px; background: none; cursor: pointer;
+    font: inherit; color: var(--ink); text-align: left;
   }
-  .card {
-    padding: 0; border: 1px solid var(--line); border-radius: var(--radius);
-    background: var(--card); cursor: pointer; overflow: hidden; text-align: left;
-    transition: border-color .12s, box-shadow .12s, transform .12s;
-  }
-  .card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.08); transform: translateY(-2px); }
-  .card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
-  .frame-wrap { width: 300px; height: 424px; overflow: hidden; background: #fff; }
-  .frame { width: 820px; height: 1160px; border: 0; transform: scale(.3658); transform-origin: top left; pointer-events: none; background: #fff; }
-  .frame.empty { display: flex; }
-  .card-label { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-top: 1px solid var(--line); }
-  .swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,.15); flex: 0 0 auto; }
-  .card-label .nm { font-size: 13.5px; font-weight: 600; }
+  .theme-row:hover { background: #fff; }
+  .theme-row.selected { background: #fff; border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+  .theme-row .sw { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 auto;
+                   border: 1px solid rgba(0,0,0,.15); }
+  .theme-row .nm { font-size: 13px; }
 
-  .generate-bar {
-    position: sticky; bottom: 0; margin-top: 26px; padding: 14px 16px;
-    background: rgba(247,245,240,.94); backdrop-filter: blur(6px);
-    border: 1px solid var(--line); border-radius: var(--radius);
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  }
-  .generate-bar .chosen { font-size: 14px; }
-  .generate-bar .chosen b { color: var(--accent); }
-  .spacer { margin-left: auto; }
-  .btn {
-    padding: 9px 16px; border: 1px solid var(--accent); border-radius: 8px;
-    background: var(--accent); color: #fff; font-weight: 600; cursor: pointer;
-  }
+  .actions { padding: 12px 16px; border-top: 1px solid var(--line); background: var(--panel); }
+  .gen-row { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 9px 10px; border: 1px solid var(--accent); border-radius: 8px;
+         background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
   .btn.ghost { background: #fff; color: var(--accent); }
   .btn:disabled { opacity: .55; cursor: default; }
-  #result { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  #result .dl { padding: 7px 12px; border-radius: 7px; border: 1px solid #cbc7bd; background: #fff;
-                color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 600; }
+  #result { margin-top: 9px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #result .dl { padding: 6px 10px; border-radius: 7px; border: 1px solid #cbc7bd; background: #fff;
+                color: var(--ink); text-decoration: none; font-size: 12px; font-weight: 600; }
   #result .dl:hover { border-color: var(--accent); color: var(--accent); }
-  #result .warn { color: #8a5a12; font-size: 13px; margin: 0; }
-  .hint { color: var(--ink-soft); font-size: 13px; }
+  #result .warn { color: #8a5a12; font-size: 11.5px; margin: 0; flex-basis: 100%; }
+
+  /* ---- preview ---- */
+  .preview-pane { flex: 1; overflow: auto; display: flex; justify-content: center;
+                  align-items: flex-start; padding: 24px; }
+  .empty { color: var(--ink-soft); margin: auto; text-align: center; font-size: 14px; }
+  .preview-frame { width: 820px; max-width: 100%; min-height: 600px; border: 0;
+                   background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.14); border-radius: 6px; }
+  .preview-frame[hidden] { display: none; }
+  .loading { position: fixed; top: 14px; right: 18px; background: var(--ink); color: #fff;
+             padding: 6px 12px; border-radius: 20px; font-size: 12px; opacity: 0; transition: opacity .15s; }
+  .loading.show { opacity: .9; }
 </style>
 </head>
 <body>
-<header class="top">
-  <h1>char2pdf</h1>
-  <span class="sub">Foundry VTT actor &rarr; printable character sheet</span>
-  <span class="ver">v__VERSION__</span>
-</header>
-<main>
-  <div id="banner" class="banner"></div>
-
-  <div id="drop">
-    <div class="big">Drop your Foundry actor JSON here</div>
-    <div class="small">&hellip; or click to choose a file. Everything stays on your computer.</div>
-    <input id="file" type="file" accept=".json,application/json" hidden>
-  </div>
-
-  <section id="workspace" hidden>
-    <div class="actor-bar">
-      <span class="who" id="actor-name">&mdash;</span>
-      <span class="cls" id="actor-class"></span>
-      <button class="btn ghost change" id="btn-change">Choose a different file</button>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="ver">v__VERSION__</span>
+      <h1>char2pdf</h1>
+      <div class="sub">Foundry VTT actor &rarr; character sheet</div>
     </div>
 
-    <div class="options">
+    <div id="banner" class="banner"></div>
+
+    <div id="drop">
+      <div class="big">Drop actor JSON here</div>
+      <div class="small">or click to choose &mdash; stays on your computer</div>
+      <input id="file" type="file" accept=".json,application/json" hidden>
+    </div>
+
+    <div class="actor" id="actor">
+      <div class="who" id="actor-name">&mdash;</div>
+      <div class="cls" id="actor-class"></div>
+      <button class="change" id="btn-change">Choose a different file</button>
+    </div>
+
+    <div class="opts">
       <div class="field">
         <label for="opt-mode">Color mode</label>
         <select id="opt-mode">
-          <option value="">Light (default)</option>
+          <option value="">Light</option>
           <option value="dark">Dark</option>
-          <option value="mono">Mono (grayscale print)</option>
+          <option value="mono">Mono</option>
         </select>
       </div>
       <div class="field">
@@ -445,24 +473,30 @@ _PAGE = r"""<!doctype html>
           <option value="letter">US Letter</option>
         </select>
       </div>
-      <div class="field check">
+      <div class="field full check">
         <input type="checkbox" id="opt-footer" checked>
-        <label for="opt-footer" style="text-transform:none;letter-spacing:0">Include attribution footer</label>
+        <label for="opt-footer">Include attribution footer</label>
       </div>
-      <span class="hint">Click a theme below to pick it &mdash; previews are live.</span>
     </div>
 
-    <div class="gallery" id="gallery"></div>
+    <div class="list-head">Themes &mdash; click to preview</div>
+    <div class="theme-list" id="themes"></div>
 
-    <div class="generate-bar">
-      <span class="chosen">Theme: <b id="chosen-theme">&mdash;</b></span>
-      <span class="spacer"></span>
+    <div class="actions">
+      <div class="gen-row">
+        <button class="btn ghost" id="btn-html" disabled>HTML</button>
+        <button class="btn" id="btn-pdf" disabled>PDF</button>
+      </div>
       <div id="result"></div>
-      <button class="btn ghost" id="btn-html">Generate HTML</button>
-      <button class="btn" id="btn-pdf">Generate PDF</button>
     </div>
-  </section>
-</main>
+  </aside>
+
+  <main class="preview-pane">
+    <div class="empty" id="empty">Upload a Foundry actor JSON to preview themes.</div>
+    <iframe class="preview-frame" id="preview" title="Sheet preview" hidden></iframe>
+  </main>
+</div>
+<div class="loading" id="loading">Rendering…</div>
 
 <script>
 const state = { themes: [], theme: null, mode: "", paper: "a4", footer: true, ready: false };
@@ -470,6 +504,7 @@ const $ = (id) => document.getElementById(id);
 
 function showError(msg) { const b = $("banner"); b.textContent = msg; b.classList.add("show"); }
 function clearError() { $("banner").classList.remove("show"); }
+function setLoading(on) { $("loading").classList.toggle("show", on); }
 
 async function uploadActor(file) {
   clearError();
@@ -479,81 +514,87 @@ async function uploadActor(file) {
   try { res = await fetch("/actor", { method: "POST", body: text }); data = await res.json(); }
   catch (e) { return showError("Could not reach the server."); }
   if (!res.ok) { return showError(data.error || "Upload failed."); }
-  state.theme = data.default_theme;
   state.ready = true;
   $("actor-name").textContent = data.name;
   $("actor-class").textContent = data.class_line || "";
-  $("workspace").hidden = false;
+  $("actor").classList.add("show");
+  $("drop").style.display = "none";
+  $("btn-html").disabled = false;
+  $("btn-pdf").disabled = false;
   if (!state.themes.length) {
     try { state.themes = await (await fetch("/themes")).json(); }
     catch (e) { return showError("Could not load themes."); }
+    buildThemeList();
   }
-  buildGallery();
-  updateChosen();
+  selectTheme(data.default_theme);
 }
 
-function previewSrc(name) {
-  const m = state.mode ? "&mode=" + encodeURIComponent(state.mode) : "";
-  return "/preview?theme=" + encodeURIComponent(name) + m + "&paper=" + state.paper;
-}
-
-const io = new IntersectionObserver((entries) => {
-  for (const e of entries) {
-    if (e.isIntersecting && !e.target.src) { e.target.src = e.target.dataset.src; io.unobserve(e.target); }
-  }
-}, { rootMargin: "300px" });
-
-function buildGallery() {
-  const g = $("gallery");
-  g.innerHTML = "";
+function buildThemeList() {
+  const list = $("themes");
+  list.innerHTML = "";
+  let lastGroup = null;
   for (const t of state.themes) {
-    const card = document.createElement("button");
-    card.className = "card" + (t.name === state.theme ? " selected" : "");
-    card.dataset.theme = t.name;
-    card.onclick = () => {
-      state.theme = t.name;
-      document.querySelectorAll(".card").forEach((c) => c.classList.toggle("selected", c.dataset.theme === t.name));
-      updateChosen();
-    };
-    const wrap = document.createElement("div");
-    wrap.className = "frame-wrap";
-    const f = document.createElement("iframe");
-    f.className = "frame";
-    f.title = t.name + " preview";
-    f.dataset.src = previewSrc(t.name);
-    io.observe(f);
-    wrap.appendChild(f);
-    const label = document.createElement("div");
-    label.className = "card-label";
+    if (t.group !== lastGroup) {
+      const h = document.createElement("div");
+      h.className = "group";
+      h.textContent = t.group;
+      list.appendChild(h);
+      lastGroup = t.group;
+    }
+    const row = document.createElement("button");
+    row.className = "theme-row";
+    row.dataset.theme = t.name;
     const sw = document.createElement("span");
-    sw.className = "swatch";
+    sw.className = "sw";
     sw.style.background = t.light_accent;
     const nm = document.createElement("span");
     nm.className = "nm";
     nm.textContent = t.name;
-    label.append(sw, nm);
-    card.append(wrap, label);
-    g.appendChild(card);
+    row.append(sw, nm);
+    row.onclick = () => selectTheme(t.name);
+    list.appendChild(row);
   }
 }
 
-function refreshPreviews() {
-  document.querySelectorAll(".frame").forEach((f) => {
-    const name = f.closest(".card").dataset.theme;
-    f.removeAttribute("src");
-    f.dataset.src = previewSrc(name);
-    io.observe(f);
-  });
+function previewSrc(name) {
+  return "/preview?palette=" + encodeURIComponent(name)
+       + "&theme=" + encodeURIComponent(state.mode || "light")
+       + "&paper=" + state.paper;
 }
 
-function updateChosen() { $("chosen-theme").textContent = state.theme || "—"; }
+function selectTheme(name) {
+  state.theme = name;
+  document.querySelectorAll(".theme-row").forEach((r) => {
+    const on = r.dataset.theme === name;
+    r.classList.toggle("selected", on);
+    if (on) r.scrollIntoView({ block: "nearest" });
+  });
+  showPreview();
+}
+
+function showPreview() {
+  if (!state.theme) return;
+  const frame = $("preview");
+  setLoading(true);
+  frame.onload = () => {
+    setLoading(false);
+    // Same-origin iframe → size it to its content so the pane scrolls naturally.
+    try {
+      const doc = frame.contentWindow.document;
+      frame.style.height = doc.documentElement.scrollHeight + "px";
+    } catch (e) { /* leave default height */ }
+  };
+  frame.src = previewSrc(state.theme);
+  frame.hidden = false;
+  $("empty").hidden = true;
+}
 
 async function generate(wantPdf) {
   clearError();
   const btn = wantPdf ? $("btn-pdf") : $("btn-html");
   const original = btn.textContent;
   btn.disabled = true;
-  btn.textContent = "Working…";
+  btn.textContent = "…";
   let res, data;
   try {
     res = await fetch("/generate", {
@@ -599,8 +640,8 @@ input.onchange = () => { if (input.files[0]) uploadActor(input.files[0]); };
 ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("hover"); }));
 drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) uploadActor(f); });
 
-$("opt-mode").onchange = (e) => { state.mode = e.target.value; if (state.ready) refreshPreviews(); };
-$("opt-paper").onchange = (e) => { state.paper = e.target.value; };
+$("opt-mode").onchange = (e) => { state.mode = e.target.value; if (state.ready) showPreview(); };
+$("opt-paper").onchange = (e) => { state.paper = e.target.value; if (state.ready) showPreview(); };
 $("opt-footer").onchange = (e) => { state.footer = e.target.checked; };
 $("btn-html").onclick = () => generate(false);
 $("btn-pdf").onclick = () => generate(true);
