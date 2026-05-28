@@ -106,7 +106,20 @@ This starts a small local server (bound to `127.0.0.1`, so nothing is exposed to
 - pick the color mode, paper size, and footer toggle,
 - and download the generated HTML (plus a PDF, if a Chromium-compatible browser is installed).
 
-Your character data never leaves your machine. Use `--port N` to change the port or `--no-browser` to skip auto-opening the browser. A double-click desktop build (no Python install needed) is planned — see Roadmap.
+Your character data never leaves your machine. Use `--port N` to change the port or `--no-browser` to skip auto-opening the browser. A basic Windows executable build is available below; polished cross-platform desktop builds are still planned.
+
+## Windows executable
+
+A basic Windows executable build is available through the `Windows EXE` GitHub Actions workflow. Run the workflow, download the `char2pdf-windows-exe` artifact, unzip it, and double-click `char2pdf.exe`.
+
+The executable starts the same local web UI as `--serve`, opens your browser, and writes generated sheets to an `output/` folder next to the executable. PDF export still requires a Chromium-compatible browser, such as Chrome or Edge, to be installed on the machine.
+
+To build it locally on Windows:
+
+```bash
+python -m pip install -r requirements-build.txt
+python -m PyInstaller --noconfirm --clean char2pdf.spec
+```
 
 ## Usage
 
@@ -187,7 +200,7 @@ python3 -m unittest discover -s tests
 
 Planned or wanted directions for the project. Contributions in any of these areas are welcome.
 
-- **Double-click desktop app.** The web UI already ships (`--serve`, with live theme previews); the remaining piece is a frozen binary (PyInstaller, distributed per-OS) so users without Python installed can run it by double-clicking. Build-time tooling only — the generator runtime stays standard-library-only.
+- **Polished desktop app packaging.** A basic Windows PyInstaller build exists; remaining work includes validating the artifact on Windows, adding icon/version metadata, deciding whether to ship macOS/Linux builds, and considering signing or installer packaging. Build-time tooling only — the generator runtime stays standard-library-only.
 - **Cross-platform PDF parity.** Make browser detection and PDF export work out of the box on Linux, macOS, and Windows without per-OS manual setup.
 - **More curated palettes.** Building on the shipped set (Solarized, Gruvbox, Tokyo Night, Kanagawa, …), add further popular schemes (Gruvbox Light, Ayu, Material, etc.) and more dedicated daytime light themes.
 - **More tabletop RPG systems.** Today the renderer only understands Foundry's `dnd5e` actor schema. Adapters for other systems (Pathfinder 2e, Call of Cthulhu, Shadowdark, etc.) behind a clear adapter boundary would make the project useful beyond D&D.

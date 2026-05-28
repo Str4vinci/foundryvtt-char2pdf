@@ -1,0 +1,53 @@
+name: Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/windows-exe.yml"
+      - "char2pdf.spec"
+      - "char2pdf_desktop.py"
+      - "generate_character_sheet.py"
+      - "requirements-build.txt"
+      - "webui.py"
+  pull_request:
+    paths:
+      - ".github/workflows/windows-exe.yml"
+      - "char2pdf.spec"
+      - "char2pdf_desktop.py"
+      - "generate_character_sheet.py"
+      - "requirements-build.txt"
+      - "webui.py"
+
+jobs:
+  build:
+    name: Build Windows executable
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests
+
+      - name: Build executable
+        run: python -m PyInstaller --noconfirm --clean char2pdf.spec
+
+      - name: Upload executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: char2pdf-windows-exe
+          path: dist/char2pdf.exe
