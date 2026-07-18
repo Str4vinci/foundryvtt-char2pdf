@@ -107,7 +107,7 @@ class WriteOutputDetectionTests(unittest.TestCase):
             actor_path = self._write(MINIMAL_ACTOR, tmp_path)
             paths = gen.write_output(actor_path, tmp_path, theme="ledger", system="dnd5e")
             self.assertEqual(len(paths), 1)
-            self.assertIn("<!doctype html>", paths[0].read_text())
+            self.assertIn("<!doctype html>", paths[0].read_text(encoding="utf-8"))
 
 
 class AdapterContractTests(unittest.TestCase):

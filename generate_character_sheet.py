@@ -5598,6 +5598,9 @@ def _render_one_theme(
         "dark_accent":         entry["dark_accent"],
         "dark_accent_strong":  entry["dark_accent_strong"],
     }
+    # Always write UTF-8: the sheet HTML contains non-latin1 glyphs (e.g. the
+    # ☾ dark-mode toggle, em dashes), and Path.write_text otherwise uses the
+    # platform default encoding (cp1252 on Windows), which cannot encode them.
     html_path.write_text(adapter.render(
         context,
         sheet_id,
@@ -5607,7 +5610,7 @@ def _render_one_theme(
         palette_decoration=entry.get("decoration"),
         include_footer=include_footer,
         paper=paper,
-    ))
+    ), encoding="utf-8")
     return html_path
 
 
@@ -5621,7 +5624,7 @@ def write_output(
     paper: str = "a4",
     system: str | None = None,
 ) -> list[Path]:
-    actor = json.loads(actor_path.read_text())
+    actor = json.loads(actor_path.read_text(encoding="utf-8"))
     adapter = systems.detect_adapter(actor, forced=system)
     context = adapter.build_context(actor)
     sheet_id = slugify(actor.get("name", actor_path.stem))

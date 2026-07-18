@@ -66,7 +66,7 @@ class GenerationSmokeTests(unittest.TestCase):
             paths = sheet.write_output(write_actor(tmp_path), tmp_path, theme="ledger")
 
             self.assertEqual(len(paths), 1)
-            html = paths[0].read_text()
+            html = paths[0].read_text(encoding="utf-8")
             self.assertIn('id="print-sheet"', html)
             self.assertIn('id="theme-sheet"', html)
             self.assertIn('class="sheet-footer"', html)
@@ -78,7 +78,7 @@ class GenerationSmokeTests(unittest.TestCase):
             tmp_path = Path(tmp)
             paths = sheet.write_output(write_actor(tmp_path), tmp_path, theme="ledger", include_footer=False)
 
-            html = paths[0].read_text()
+            html = paths[0].read_text(encoding="utf-8")
             self.assertNotIn('class="sheet-footer"', html)
             self.assertNotIn("Made by Stravinci @ stravinci.pt", html)
 
@@ -87,7 +87,7 @@ class GenerationSmokeTests(unittest.TestCase):
             tmp_path = Path(tmp)
             paths = sheet.write_output(write_actor(tmp_path), tmp_path, theme="ledger", paper="letter")
 
-            html = paths[0].read_text()
+            html = paths[0].read_text(encoding="utf-8")
             self.assertIn("@page { size: Letter; margin: 0.35in; }", html)
 
     def test_all_themes_render_html_without_pdf(self) -> None:
@@ -97,7 +97,7 @@ class GenerationSmokeTests(unittest.TestCase):
 
             self.assertEqual(len(paths), len(sheet.THEMES))
             for path in paths:
-                html = path.read_text()
+                html = path.read_text(encoding="utf-8")
                 self.assertIn("<!doctype html>", html)
                 self.assertIn('data-theme", initial', html)
 
