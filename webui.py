@@ -21,6 +21,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import generate_character_sheet as gen
+import systems
 
 # Where generated files are written. Configured by run(); used by the HTTP path.
 OUTPUT_DIR = Path("output")
@@ -36,6 +37,7 @@ _LAYOUT_THEMES = {"ledger", "gazette", "grimoire"}
 class _State:
     def __init__(self) -> None:
         self.context: dict | None = None
+        self.adapter: systems.SystemAdapter = gen.DND5E_ADAPTER
         self.sheet_id: str = "sheet"
         self.name: str = ""
         self.default_theme: str = "ledger"
@@ -47,10 +49,14 @@ STATE = _State()
 def load_actor(actor: dict) -> dict:
     """Parse an uploaded actor dict into a render context and store it.
 
-    Returns a small summary for the UI (name, class line, detected theme).
+    Detects the actor's game system first; an unsupported export raises
+    :class:`systems.UnsupportedSystemError`, which the HTTP layer surfaces to the
+    user. Returns a small summary for the UI (name, class line, detected theme).
     """
-    context = gen.sheet_context(actor)
-    default = gen.primary_class_slug(actor) or "ledger"
+    adapter = systems.detect_adapter(actor)
+    context = adapter.build_context(actor)
+    default = adapter.default_theme(actor) or "ledger"
+    STATE.adapter = adapter
     STATE.context = context
     STATE.sheet_id = gen.slugify(actor.get("name", "sheet"))
     STATE.name = actor.get("name") or "Unnamed Character"
@@ -105,13 +111,14 @@ def render_preview(theme: str, mode: str | None, paper: str = "a4") -> str:
     if STATE.context is None:
         raise ValueError("No actor loaded.")
     _, entry = _resolve(theme)
-    html = gen.render_character_sheet(
+    html = STATE.adapter.render(
         STATE.context,
         STATE.sheet_id,
         style=entry["base"],
         initial_theme=mode,
         theme_palette=_palette(entry),
         palette_decoration=entry.get("decoration"),
+        include_footer=True,
         paper=paper,
     )
     return html.replace(
@@ -134,7 +141,7 @@ def generate_files(theme: str, mode: str | None, paper: str, footer: bool,
     label, entry = _resolve(theme)
     html_path = gen._render_one_theme(
         STATE.context, STATE.sheet_id, output_dir, label, dict(entry), mode,
-        include_footer=footer, paper=paper,
+        include_footer=footer, paper=paper, adapter=STATE.adapter,
     )
     result: dict = {"html": html_path.name, "theme": label}
     if want_pdf:
@@ -239,6 +246,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             summary = load_actor(actor)
+        except systems.UnsupportedSystemError as exc:
+            self._err(HTTPStatus.BAD_REQUEST, str(exc))
+            return
         except Exception as exc:
             self._err(HTTPStatus.BAD_REQUEST, f"Could not read that actor: {exc}")
             return
