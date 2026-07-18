@@ -2362,6 +2362,22 @@ THEMES: dict[str, dict] = {
     "kanagawa":         {"base": "ledger", "decoration": "kanagawa",
                          "light_accent": "#4d699b", "light_accent_strong": "#c84053",
                          "dark_accent":  "#7e9cd8", "dark_accent_strong":  "#98bb6c"},
+    # Daytime-leaning batch — light-first schemes plus their dark counterparts
+    "gruvbox-light":    {"base": "ledger", "decoration": "gruvbox-light",
+                         "light_accent": "#9d0006", "light_accent_strong": "#b57614",
+                         "dark_accent":  "#fb4934", "dark_accent_strong":  "#fabd2f"},
+    "ayu-light":        {"base": "ledger", "decoration": "ayu-light",
+                         "light_accent": "#fa8d3e", "light_accent_strong": "#399ee6",
+                         "dark_accent":  "#ffcc66", "dark_accent_strong":  "#59c2ff"},
+    "ayu-mirage":       {"base": "ledger", "decoration": "ayu-mirage",
+                         "light_accent": "#399ee6", "light_accent_strong": "#f07171",
+                         "dark_accent":  "#5ccfe6", "dark_accent_strong":  "#ffcc66"},
+    "material":         {"base": "ledger", "decoration": "material",
+                         "light_accent": "#6182b8", "light_accent_strong": "#39adb5",
+                         "dark_accent":  "#82aaff", "dark_accent_strong":  "#89ddff"},
+    "everforest-light": {"base": "ledger", "decoration": "everforest-light",
+                         "light_accent": "#35a77c", "light_accent_strong": "#3a94c5",
+                         "dark_accent":  "#83c092", "dark_accent_strong":  "#7fbbb3"},
     # Class themes — ledger baseline + class accent
     **{name: _class_theme_entry(accent) for name, accent in CLASS_THEME_COLORS.items()},
 }
@@ -3387,6 +3403,152 @@ def _sheet_palette_css(palette: str | None) -> str:
           inset: 0;
           background: linear-gradient(135deg, rgba(126, 156, 216, 0.10), transparent 46%);
           pointer-events: none;
+        }
+        """
+    if palette == "gruvbox-light":
+        return r"""
+        body.dnd-layout-palette-gruvbox-light {
+          --serif: "Zilla Slab", "Roboto Slab", "Rockwell", "Georgia", serif;
+          --display: "Zilla Slab", "Roboto Slab", "Rockwell", serif;
+          --sans: "Work Sans", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 88% 8%, rgba(157, 0, 6, 0.10), transparent 38%),
+            radial-gradient(circle at 12% 90%, rgba(181, 118, 20, 0.08), transparent 42%),
+            linear-gradient(180deg, rgba(251, 241, 199, 0.85), transparent 240px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-gruvbox-light .dnd-layout-page-title,
+        body.dnd-layout-palette-gruvbox-light .dnd-layout-section-title,
+        body.dnd-layout-palette-gruvbox-light .dnd-layout-label,
+        body.dnd-layout-palette-gruvbox-light .dnd-layout-token,
+        body.dnd-layout-palette-gruvbox-light .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-gruvbox-light .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-gruvbox-light button {
+          font-family: var(--display);
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-gruvbox-light .dnd-layout-panel::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(157, 0, 6, 0.05), transparent 44%);
+          pointer-events: none;
+        }
+        """
+    if palette == "ayu-light":
+        return r"""
+        body.dnd-layout-palette-ayu-light {
+          --serif: "Source Serif 4", "Source Serif Pro", "Georgia", serif;
+          --display: "Rubik", "Manrope", "Inter", "Helvetica Neue", sans-serif;
+          --sans: "Rubik", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 88% 8%, rgba(250, 141, 62, 0.12), transparent 38%),
+            radial-gradient(circle at 12% 90%, rgba(57, 158, 230, 0.07), transparent 42%),
+            linear-gradient(180deg, rgba(252, 252, 252, 0.80), transparent 220px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-ayu-light .dnd-layout-page-title,
+        body.dnd-layout-palette-ayu-light .dnd-layout-section-title,
+        body.dnd-layout-palette-ayu-light .dnd-layout-label,
+        body.dnd-layout-palette-ayu-light .dnd-layout-token,
+        body.dnd-layout-palette-ayu-light .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-ayu-light .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-ayu-light button {
+          font-family: var(--display);
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-ayu-light .dnd-layout-page,
+        body.dnd-layout-palette-ayu-light .dnd-layout-panel {
+          border-color: rgba(250, 141, 62, 0.22);
+        }
+        """
+    if palette == "ayu-mirage":
+        return r"""
+        body.dnd-layout-palette-ayu-mirage {
+          --serif: "Source Serif 4", "Source Serif Pro", "Georgia", serif;
+          --display: "Rubik", "Manrope", "Inter", "Helvetica Neue", sans-serif;
+          --sans: "Rubik", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 16% 12%, rgba(57, 158, 230, 0.10), transparent 34%),
+            radial-gradient(circle at 84% 84%, rgba(240, 113, 113, 0.07), transparent 36%),
+            linear-gradient(180deg, rgba(225, 230, 237, 0.55), transparent 220px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-ayu-mirage .dnd-layout-page-title,
+        body.dnd-layout-palette-ayu-mirage .dnd-layout-section-title,
+        body.dnd-layout-palette-ayu-mirage .dnd-layout-label,
+        body.dnd-layout-palette-ayu-mirage .dnd-layout-token,
+        body.dnd-layout-palette-ayu-mirage .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-ayu-mirage .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-ayu-mirage button {
+          font-family: var(--display);
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-ayu-mirage .dnd-layout-panel::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(57, 158, 230, 0.07), transparent 42%);
+          pointer-events: none;
+        }
+        """
+    if palette == "material":
+        return r"""
+        body.dnd-layout-palette-material {
+          --serif: "Roboto Slab", "Source Serif 4", "Georgia", serif;
+          --display: "Roboto Condensed", "Roboto", "Helvetica Neue", sans-serif;
+          --sans: "Roboto", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 16% 12%, rgba(97, 130, 184, 0.12), transparent 34%),
+            radial-gradient(circle at 84% 84%, rgba(57, 173, 181, 0.08), transparent 36%),
+            linear-gradient(180deg, rgba(236, 239, 241, 0.75), transparent 220px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-material .dnd-layout-page-title,
+        body.dnd-layout-palette-material .dnd-layout-section-title,
+        body.dnd-layout-palette-material .dnd-layout-label,
+        body.dnd-layout-palette-material .dnd-layout-token,
+        body.dnd-layout-palette-material .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-material .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-material button {
+          font-family: var(--display);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-material .dnd-layout-page,
+        body.dnd-layout-palette-material .dnd-layout-panel {
+          border-color: rgba(97, 130, 184, 0.22);
+        }
+        """
+    if palette == "everforest-light":
+        return r"""
+        body.dnd-layout-palette-everforest-light {
+          --serif: "Bitter", "Source Serif 4", "Georgia", serif;
+          --display: "Mulish", "Quicksand", "Avenir Next", sans-serif;
+          --sans: "Mulish", "Inter", "Helvetica Neue", sans-serif;
+          background:
+            radial-gradient(circle at 88% 8%, rgba(53, 167, 124, 0.11), transparent 38%),
+            radial-gradient(circle at 12% 90%, rgba(58, 148, 197, 0.07), transparent 42%),
+            linear-gradient(180deg, rgba(253, 246, 227, 0.80), transparent 240px),
+            var(--paper);
+        }
+        body.dnd-layout-palette-everforest-light .dnd-layout-page-title,
+        body.dnd-layout-palette-everforest-light .dnd-layout-section-title,
+        body.dnd-layout-palette-everforest-light .dnd-layout-label,
+        body.dnd-layout-palette-everforest-light .dnd-layout-token,
+        body.dnd-layout-palette-everforest-light .dnd-layout-summary-card .value,
+        body.dnd-layout-palette-everforest-light .dnd-layout-mini-stat .value,
+        body.dnd-layout-palette-everforest-light button {
+          font-family: var(--display);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        body.dnd-layout-palette-everforest-light .dnd-layout-page,
+        body.dnd-layout-palette-everforest-light .dnd-layout-panel {
+          border-color: rgba(53, 167, 124, 0.20);
         }
         """
     return ""

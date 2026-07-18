@@ -57,8 +57,10 @@ Curated palette themes (ledger layout + bespoke decoration):
 - `nord`
 - `hearth`
 - `solarized`
-- `everforest`
-- `gruvbox`
+- `everforest` / `everforest-light`
+- `gruvbox` / `gruvbox-light`
+- `ayu-light` / `ayu-mirage`
+- `material`
 - `tokyo-night`
 - `one-dark`
 - `rose-pine` / `rose-pine-dawn`
@@ -208,7 +210,7 @@ Planned or wanted directions for the project. Contributions in any of these area
 
 - **Polished desktop app packaging.** A basic Windows PyInstaller build exists; remaining work includes validating the artifact on Windows, adding icon/version metadata, deciding whether to ship macOS/Linux builds, and considering signing or installer packaging. Build-time tooling only — the generator runtime stays standard-library-only.
 - **Cross-platform PDF parity.** Make browser detection and PDF export work out of the box on Linux, macOS, and Windows without per-OS manual setup.
-- **More curated palettes.** Building on the shipped set (Solarized, Gruvbox, Tokyo Night, Kanagawa, …), add further popular schemes (Gruvbox Light, Ayu, Material, etc.) and more dedicated daytime light themes.
+- **More curated palettes.** A daytime-leaning batch shipped (Gruvbox Light, Ayu Light/Mirage, Material, Everforest Light) on top of the existing set (Solarized, Gruvbox, Tokyo Night, Kanagawa, …). Further popular schemes and more dedicated light themes are still welcome.
 - **More tabletop RPG systems.** A system-adapter boundary now separates system-specific schema/layout code from the shared framework (themes, color modes, paper profiles, PDF export, web UI). `dnd5e` is the first and currently only adapter. Adding another system (Pathfinder 2e, Call of Cthulhu, Shadowdark, etc.) means writing a new adapter — see [Adding a new game system](#adding-a-new-game-system).
 - **Per-system print tuning.** A4 and US Letter profiles already ship; future work should tune page density and content priorities per game system.
 
