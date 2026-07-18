@@ -19,6 +19,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+import systems
+
 
 APP_VERSION = "0.3.0"
 APP_STORAGE_VERSION = APP_VERSION.replace(".", "-")
@@ -5514,6 +5516,70 @@ def render_character_sheet(
     return html
 
 
+class Dnd5eAdapter:
+    """System adapter for Foundry's ``dnd5e`` system (and D&D 2024-style data).
+
+    This is the first and currently only adapter. It is a thin object that binds
+    the module's dnd5e schema logic (parsing/derivation in ``sheet_context``,
+    class-based theming in ``primary_class_slug``, and layout in
+    ``render_character_sheet``) to the :class:`systems.SystemAdapter` contract, so
+    the generic pipeline in :func:`write_output` (and the web UI) never touches
+    dnd5e specifics directly — it only ever goes through this boundary.
+
+    A second system (e.g. Pathfinder 2e) would add its own adapter with the same
+    four methods and register it in :mod:`systems`; it would inherit the shared
+    theme registry, color modes, paper profiles, PDF export, and web UI for free.
+    """
+
+    system_id = "dnd5e"
+    display_name = "D&D Fifth Edition (dnd5e)"
+
+    #: Ability keys every dnd5e actor carries — the schema fingerprint used to
+    #: recognize an export that does not declare its system id.
+    _FINGERPRINT_ABILITIES = frozenset(ABILITY_ORDER)
+
+    def matches(self, actor: dict[str, Any]) -> bool:
+        system = actor.get("system")
+        if not isinstance(system, dict):
+            return False
+        abilities = system.get("abilities")
+        if not isinstance(abilities, dict):
+            return False
+        return self._FINGERPRINT_ABILITIES.issubset(abilities.keys())
+
+    def build_context(self, actor: dict[str, Any]) -> dict[str, Any]:
+        return sheet_context(actor)
+
+    def default_theme(self, actor: dict[str, Any]) -> str | None:
+        return primary_class_slug(actor)
+
+    def render(
+        self,
+        context: dict[str, Any],
+        sheet_id: str,
+        *,
+        style: str,
+        initial_theme: str | None,
+        theme_palette: dict[str, str] | None,
+        palette_decoration: str | None,
+        include_footer: bool,
+        paper: str,
+    ) -> str:
+        return render_character_sheet(
+            context,
+            sheet_id,
+            style=style,
+            initial_theme=initial_theme,
+            theme_palette=theme_palette,
+            palette_decoration=palette_decoration,
+            include_footer=include_footer,
+            paper=paper,
+        )
+
+
+DND5E_ADAPTER = systems.register(Dnd5eAdapter())
+
+
 def _render_one_theme(
     context: dict[str, Any],
     sheet_id: str,
@@ -5523,6 +5589,7 @@ def _render_one_theme(
     mode: str | None,
     include_footer: bool = True,
     paper: str = "a4",
+    adapter: systems.SystemAdapter = DND5E_ADAPTER,
 ) -> Path:
     html_path = output_dir / f"{sheet_id}-character-sheet-{theme_label.lstrip('#')}.html"
     palette = {
@@ -5531,7 +5598,10 @@ def _render_one_theme(
         "dark_accent":         entry["dark_accent"],
         "dark_accent_strong":  entry["dark_accent_strong"],
     }
-    html_path.write_text(render_character_sheet(
+    # Always write UTF-8: the sheet HTML contains non-latin1 glyphs (e.g. the
+    # ☾ dark-mode toggle, em dashes), and Path.write_text otherwise uses the
+    # platform default encoding (cp1252 on Windows), which cannot encode them.
+    html_path.write_text(adapter.render(
         context,
         sheet_id,
         style=entry["base"],
@@ -5540,7 +5610,7 @@ def _render_one_theme(
         palette_decoration=entry.get("decoration"),
         include_footer=include_footer,
         paper=paper,
-    ))
+    ), encoding="utf-8")
     return html_path
 
 
@@ -5552,23 +5622,25 @@ def write_output(
     all_themes: bool = False,
     include_footer: bool = True,
     paper: str = "a4",
+    system: str | None = None,
 ) -> list[Path]:
-    actor = json.loads(actor_path.read_text())
-    context = sheet_context(actor)
+    actor = json.loads(actor_path.read_text(encoding="utf-8"))
+    adapter = systems.detect_adapter(actor, forced=system)
+    context = adapter.build_context(actor)
     sheet_id = slugify(actor.get("name", actor_path.stem))
 
     if all_themes:
         return [
-            _render_one_theme(context, sheet_id, output_dir, name, dict(entry), mode, include_footer=include_footer, paper=paper)
+            _render_one_theme(context, sheet_id, output_dir, name, dict(entry), mode, include_footer=include_footer, paper=paper, adapter=adapter)
             for name, entry in THEMES.items()
         ]
 
-    resolved = resolve_theme_entry(theme) if theme else resolve_theme_entry(primary_class_slug(actor))
+    resolved = resolve_theme_entry(theme) if theme else resolve_theme_entry(adapter.default_theme(actor))
     if resolved is None:
         # No actor class detected and no --theme passed → fall back to ledger
         resolved = ("ledger", dict(THEMES["ledger"]))
     label, entry = resolved
-    return [_render_one_theme(context, sheet_id, output_dir, label, entry, mode, include_footer=include_footer, paper=paper)]
+    return [_render_one_theme(context, sheet_id, output_dir, label, entry, mode, include_footer=include_footer, paper=paper, adapter=adapter)]
 
 
 def chromium_path(explicit: str | None) -> str | None:
@@ -5653,6 +5725,15 @@ def parse_args() -> argparse.Namespace:
             + ". Or a #RRGGBB hex (uses ledger baseline). Defaults to the actor's primary class."
         ),
     )
+    parser.add_argument(
+        "--system",
+        choices=systems.known_ids(),
+        default=None,
+        help=(
+            "Force the game system instead of auto-detecting it. "
+            "Registered: " + ", ".join(systems.known_ids()) + ". Defaults to auto-detect."
+        ),
+    )
     parser.add_argument("--all-themes", action="store_true", help="Render one HTML per registered theme")
     parser.add_argument("--pdf", action="store_true", help="Also generate a PDF using local Chromium")
     parser.add_argument("--chromium", help="Explicit Chromium executable path")
@@ -5674,15 +5755,20 @@ def main() -> int:
         import webui
         return webui.run(port=args.port, output_dir=args.output_dir, open_browser=not args.no_browser)
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    html_paths = write_output(
-        args.actor_json,
-        args.output_dir,
-        mode=args.mode,
-        theme=args.theme,
-        all_themes=args.all_themes,
-        include_footer=not args.no_footer,
-        paper=args.paper,
-    )
+    try:
+        html_paths = write_output(
+            args.actor_json,
+            args.output_dir,
+            mode=args.mode,
+            theme=args.theme,
+            all_themes=args.all_themes,
+            include_footer=not args.no_footer,
+            paper=args.paper,
+            system=args.system,
+        )
+    except systems.UnsupportedSystemError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     for path in html_paths:
         print(f"HTML written to {path}")
 
