@@ -171,6 +171,12 @@ Render every registered theme in one run:
 python3 generate_character_sheet.py path/to/actor.json --all-themes
 ```
 
+Force the game system instead of auto-detecting it (only `dnd5e` is supported today):
+
+```bash
+python3 generate_character_sheet.py path/to/actor.json --system dnd5e
+```
+
 Use a specific browser for PDF export:
 
 ```bash
@@ -203,7 +209,7 @@ Planned or wanted directions for the project. Contributions in any of these area
 - **Polished desktop app packaging.** A basic Windows PyInstaller build exists; remaining work includes validating the artifact on Windows, adding icon/version metadata, deciding whether to ship macOS/Linux builds, and considering signing or installer packaging. Build-time tooling only — the generator runtime stays standard-library-only.
 - **Cross-platform PDF parity.** Make browser detection and PDF export work out of the box on Linux, macOS, and Windows without per-OS manual setup.
 - **More curated palettes.** Building on the shipped set (Solarized, Gruvbox, Tokyo Night, Kanagawa, …), add further popular schemes (Gruvbox Light, Ayu, Material, etc.) and more dedicated daytime light themes.
-- **More tabletop RPG systems.** Today the renderer only understands Foundry's `dnd5e` actor schema. Adapters for other systems (Pathfinder 2e, Call of Cthulhu, Shadowdark, etc.) behind a clear adapter boundary would make the project useful beyond D&D.
+- **More tabletop RPG systems.** A system-adapter boundary now separates system-specific schema/layout code from the shared framework (themes, color modes, paper profiles, PDF export, web UI). `dnd5e` is the first and currently only adapter. Adding another system (Pathfinder 2e, Call of Cthulhu, Shadowdark, etc.) means writing a new adapter — see [Adding a new game system](#adding-a-new-game-system).
 - **Per-system print tuning.** A4 and US Letter profiles already ship; future work should tune page density and content priorities per game system.
 
 ## Contributing
@@ -216,4 +222,38 @@ Issues and pull requests are welcome.
 - When fixing a rendering bug, include a sanitized actor JSON (or a minimal repro) that triggers it.
 - Do not commit private actor exports, generated `output/`, or third-party copyrighted artwork.
 - New themes should add an entry to `THEMES` in `generate_character_sheet.py` and follow the existing `light_accent` / `dark_accent` pattern.
-- New TTRPG-system support should live behind a clear adapter boundary so the existing `dnd5e` path is not regressed.
+- New TTRPG-system support should live behind the system-adapter boundary so the existing `dnd5e` path is not regressed. See [Adding a new game system](#adding-a-new-game-system).
+
+## Adding a new game system
+
+The generator understands more than one Foundry game system through a small
+**system-adapter boundary**, defined in `systems.py`. That module is the framework
+side: it detects which system an actor export came from and looks up the adapter
+that handles it, but it contains no knowledge of any specific system.
+
+A system adapter is any object satisfying the `systems.SystemAdapter` protocol:
+
+| Member | Responsibility |
+| --- | --- |
+| `system_id: str` | The Foundry `systemId` this adapter handles (e.g. `"dnd5e"`). Used for auto-detection and the `--system` flag, so it must match Foundry's real id. |
+| `display_name: str` | Human-readable name for messages and docs. |
+| `matches(actor) -> bool` | Recognize the actor's schema shape. Called only when the export carries no usable `_stats.systemId` hint. |
+| `build_context(actor) -> dict` | Parse the raw actor export into a render-ready context dict. |
+| `default_theme(actor) -> str \| None` | The theme to use when the caller did not request one. |
+| `render(context, sheet_id, *, style, initial_theme, theme_palette, palette_decoration, include_footer, paper) -> str` | Render one themed sheet (a full HTML document). |
+
+Everything else is **shared framework that every adapter inherits for free**: the
+`THEMES` registry and palettes, the `light` / `dark` / `mono` color modes, the A4
+and US Letter paper profiles, PDF export, browser detection, the local web UI, and
+the browser `localStorage` trackers.
+
+To add a system:
+
+1. Write an adapter object implementing the protocol above. The `dnd5e` adapter
+   (`Dnd5eAdapter` in `generate_character_sheet.py`) is the reference; a new
+   system can live in its own module.
+2. Register it with `systems.register(YourAdapter())` at import time.
+3. Detection then works automatically: an export whose `_stats.systemId` matches
+   your `system_id`, or whose schema your `matches()` recognizes, routes to your
+   adapter. Unsupported exports raise a clear `systems.UnsupportedSystemError`
+   naming the detected system in both the CLI and the web UI.

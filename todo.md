@@ -47,7 +47,9 @@
 
 - [x] Added a local web UI (`--serve`, `webui.py`): drop or browse an actor JSON, see a live per-theme preview gallery, pick color mode / paper / footer, then download the HTML (and PDF if a browser is present). Bound to `127.0.0.1`; character data stays local. Reuses the generator's render/PDF functions and is covered by `tests/test_webui.py`.
 - [x] Added a basic Windows PyInstaller path: `char2pdf_desktop.py`, `char2pdf.spec`, build-only `requirements-build.txt`, and a `Windows EXE` GitHub Actions workflow that uploads `char2pdf.exe`.
+- [x] Introduced a system-adapter boundary (`systems.py`): system detection (via Foundry `_stats.systemId`/flags hint, falling back to schema sniffing), a `SystemAdapter` protocol (`matches` / `build_context` / `default_theme` / `render`), and a registry. `dnd5e` is the first adapter (`Dnd5eAdapter`, delegating to the existing schema/layout code); output is byte-identical to before. Unsupported exports raise a clear `UnsupportedSystemError` (named system, exit code 2 in the CLI, banner in the web UI). Added `--system` to force a system, plus `tests/test_systems.py`. No second system implemented yet — the boundary is the deliverable.
 
 ## Open
+- [ ] Implement a second game system (e.g. Pathfinder 2e) against the new adapter boundary once a sanitized fixture export is available.
 - [ ] Polish desktop app packaging beyond the basic Windows executable: validate the artifact on Windows, decide on icon/version metadata, add macOS/Linux builds if wanted, and consider signing/installer packaging.
 - [ ] Validate PDF export on real macOS and Windows machines.
