@@ -53,4 +53,7 @@
 ## Open
 - [ ] Implement a second game system (e.g. Pathfinder 2e) against the new adapter boundary once a sanitized fixture export is available.
 - [ ] Polish desktop app packaging beyond the basic Windows executable: validate the artifact on Windows, decide on icon/version metadata, add macOS/Linux builds if wanted, and consider signing/installer packaging.
-- [ ] Validate PDF export on real macOS and Windows machines.
+- [ ] Validate PDF export on a real Windows machine.
+
+## Recently done
+- [x] Broadened print-browser detection to cover more Chromium-based browsers (Brave, Vivaldi, Helium, Arc) alongside Chrome/Edge/Chromium, and to also check the per-user `~/Applications` directory on macOS. Validated end-to-end PDF export on real macOS (via Helium) across all 13 real `dnd5e` exports (warlock/cleric/barbarian/bard/rogue/paladin/fighter/monk/artificer/druid). Added detection tests.

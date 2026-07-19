@@ -5824,18 +5824,38 @@ def detect_print_browser(
         "chrome",
         "msedge",
         "microsoft-edge",
+        "brave-browser",
+        "brave",
+        "vivaldi",
+        "vivaldi-stable",
+        "helium",
     ):
         found = which(candidate)
         if found:
             return found
+    # macOS app bundles. Each browser can live in the system-wide /Applications
+    # or a per-user ~/Applications, so probe both. Chrome/Edge come first to match
+    # the historical preference order; the rest are other Chromium-based browsers.
+    mac_bundles = [
+        "Google Chrome.app/Contents/MacOS/Google Chrome",
+        "Chromium.app/Contents/MacOS/Chromium",
+        "Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        "Brave Browser.app/Contents/MacOS/Brave Browser",
+        "Vivaldi.app/Contents/MacOS/Vivaldi",
+        "Helium.app/Contents/MacOS/Helium",
+        "Arc.app/Contents/MacOS/Arc",
+    ]
+    mac_app_dirs = [Path("/Applications"), Path.home() / "Applications"]
     platform_paths = [
-        Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
-        Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
-        Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
+        app_dir / bundle for bundle in mac_bundles for app_dir in mac_app_dirs
+    ]
+    platform_paths += [
         Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
         Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
         Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
         Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
+        Path(r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"),
+        Path(r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe"),
     ]
     for candidate in platform_paths:
         if exists(candidate):

@@ -84,9 +84,9 @@ Every generated HTML sheet also includes an in-browser theme toggle that cycles 
 
 - Python `3.10+`. Older Python versions are not supported because the generator uses modern type-hint syntax.
 - No third-party Python packages; the generator uses only the Python standard library
-- A Chromium-compatible browser for PDF export: Chromium, Google Chrome, or Microsoft Edge
+- A Chromium-compatible browser for PDF export: Chromium, Google Chrome, Microsoft Edge, Brave, Vivaldi, Helium, or Arc
 
-HTML generation works with vanilla Python alone. PDF generation additionally requires a local Chromium-compatible browser. The generator looks for common Linux commands plus standard macOS and Windows Chrome/Edge install paths. If autodetection does not find your browser, pass it explicitly with `--print-browser /path/to/browser` or the legacy `--chromium /path/to/browser`. CI checks the minimum supported Python version, currently Python 3.10.
+HTML generation works with vanilla Python alone. PDF generation additionally requires a local Chromium-compatible browser. The generator looks for common Linux commands plus standard macOS and Windows install paths for the browsers listed above, checking both the system-wide `/Applications` and a per-user `~/Applications` on macOS. If autodetection does not find your browser, pass it explicitly with `--print-browser /path/to/browser` or the legacy `--chromium /path/to/browser`. CI checks the minimum supported Python version, currently Python 3.10.
 
 ## Graphical interface (no command line)
 
@@ -209,7 +209,7 @@ python3 -m unittest discover -s tests
 Planned or wanted directions for the project. Contributions in any of these areas are welcome.
 
 - **Polished desktop app packaging.** A basic Windows PyInstaller build exists; remaining work includes validating the artifact on Windows, adding icon/version metadata, deciding whether to ship macOS/Linux builds, and considering signing or installer packaging. Build-time tooling only — the generator runtime stays standard-library-only.
-- **Cross-platform PDF parity.** Make browser detection and PDF export work out of the box on Linux, macOS, and Windows without per-OS manual setup.
+- **Cross-platform PDF parity.** Browser detection now covers Chrome, Edge, Chromium, Brave, Vivaldi, Helium, and Arc across Linux/macOS/Windows (including per-user `~/Applications` on macOS), and PDF export is validated on macOS. Remaining work is validating the Windows path on a real machine.
 - **More curated palettes.** A daytime-leaning batch shipped (Gruvbox Light, Ayu Light/Mirage, Material, Everforest Light) on top of the existing set (Solarized, Gruvbox, Tokyo Night, Kanagawa, …). Further popular schemes and more dedicated light themes are still welcome.
 - **More tabletop RPG systems.** A system-adapter boundary now separates system-specific schema/layout code from the shared framework (themes, color modes, paper profiles, PDF export, web UI). `dnd5e` is the first and currently only adapter. Adding another system (Pathfinder 2e, Call of Cthulhu, Shadowdark, etc.) means writing a new adapter — see [Adding a new game system](#adding-a-new-game-system).
 - **Per-system print tuning.** A4 and US Letter profiles already ship; future work should tune page density and content priorities per game system.
