@@ -1,8 +1,10 @@
 # foundryvtt-char2pdf
 
-`foundryvtt-char2pdf` converts Foundry VTT actor exports into interactive HTML sheets and printable PDFs.
+`foundryvtt-char2pdf` converts D&D 5e character exports into interactive HTML sheets and printable PDFs.
 
 Current support is for Foundry's `dnd5e` system, including D&D 2024-style character data. It is character-agnostic within that system: if you feed it a different `dnd5e` actor export, it should generate a sheet for that character too.
+
+It also reads and writes **Lion's Den "Fight Club 5e" / "Game Master 5" XML** (the format those mobile apps use). Fight Club characters are D&D 5e too, so they render through the same engine — every theme, color mode, paper size, and the web UI work identically — and any character can be converted back out to Fight Club XML with `--to-fightclub`. See [Fight Club 5e XML](#fight-club-5e-xml).
 
 Current release: `v0.3.0`
 
@@ -187,6 +189,37 @@ python3 generate_character_sheet.py path/to/actor.json --pdf --print-browser /pa
 
 Outputs are written to `output/` (override with `--output-dir`).
 
+## Fight Club 5e XML
+
+Besides Foundry JSON, the generator reads the XML that Lion's Den's **Fight Club 5e** and **Game Master 5** mobile apps export (a `<pc version="5">` document). Point the CLI or the web UI at the `.xml` file exactly as you would a Foundry export — it is detected automatically by file extension or content, converted into the same D&D 5e data model, and rendered by the identical engine:
+
+```bash
+python3 generate_character_sheet.py "path/to/My Character.xml" --pdf
+```
+
+In the web UI (`--serve`), drop the `.xml` file onto the same drop zone.
+
+A few things do not survive the Fight Club format, because the export itself does not carry them:
+
+- **Weapon attack rows.** Fight Club stores inventory as item names without damage dice, so weapons appear in your equipment list but the "Weapons & Damage Cantrips" block is not auto-filled.
+- **Armor/weapon/language proficiency chips** and **subclass** are not encoded in a structured way and may show blank.
+- **Ability scores from feats/ASIs.** Scores are reconstructed from the base array plus the export's ability modifiers. A few ASIs are stored without a target ability; those are applied to your class's spellcasting ability (the stat a caster usually maxes). Double-check the final scores against your app if a character took an unusual ASI.
+
+### Exporting back to Fight Club
+
+The reverse conversion is also available: `--to-fightclub` turns a Foundry (or already-imported) character into a Fight Club 5e XML file you can load into the mobile apps. It writes `<name>.xml` to the output directory instead of rendering a sheet:
+
+```bash
+python3 generate_character_sheet.py path/to/actor.json --to-fightclub
+```
+
+This is a best-effort conversion — the target format cannot represent everything:
+
+- Final ability scores are written as the base scores with no racial/ASI modifiers, so the totals display correctly without double-counting.
+- **Weapon damage** is not written (the format has no field for it), items are **not marked equipped**, and features are exported as plain-text entries.
+
+Verify the imported character in the app before relying on it.
+
 ## Tests
 
 Run the smoke tests with:
@@ -212,6 +245,7 @@ Planned or wanted directions for the project. Contributions in any of these area
 - **Cross-platform PDF parity.** Make browser detection and PDF export work out of the box on Linux, macOS, and Windows without per-OS manual setup.
 - **More curated palettes.** A daytime-leaning batch shipped (Gruvbox Light, Ayu Light/Mirage, Material, Everforest Light) on top of the existing set (Solarized, Gruvbox, Tokyo Night, Kanagawa, …). Further popular schemes and more dedicated light themes are still welcome.
 - **More tabletop RPG systems.** A system-adapter boundary now separates system-specific schema/layout code from the shared framework (themes, color modes, paper profiles, PDF export, web UI). `dnd5e` is the first and currently only adapter. Adding another system (Pathfinder 2e, Call of Cthulhu, Shadowdark, etc.) means writing a new adapter — see [Adding a new game system](#adding-a-new-game-system).
+- **More import/export formats.** Alongside Foundry JSON, the generator reads and writes Lion's Den Fight Club 5e / Game Master 5 XML (see [Fight Club 5e XML](#fight-club-5e-xml)). Both directions are intentionally lossy where the format omits data (weapon damage, some proficiencies, subclass, equipped state); tightening those gaps and adding further formats (D&D Beyond, other apps) is welcome.
 - **Per-system print tuning.** A4 and US Letter profiles already ship; future work should tune page density and content priorities per game system.
 
 ## Contributing

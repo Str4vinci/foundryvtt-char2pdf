@@ -7,6 +7,9 @@ build/
 dist/
 
 voria_chars/
+char_exports/
+sheets/
+xml/
 
 DnD_2024_Character-Sheet.pdf
 fvtt-Actor-*.json

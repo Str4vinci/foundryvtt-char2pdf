@@ -19,6 +19,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+import fightclub
 import systems
 
 
@@ -5776,6 +5777,19 @@ def _render_one_theme(
     return html_path
 
 
+def load_actor_file(actor_path: Path) -> dict[str, Any]:
+    """Read an actor export into a Foundry-shaped actor dict.
+
+    Accepts both Foundry VTT JSON exports and Lion's Den "Fight Club 5e" XML
+    exports (``.xml`` extension or a ``<pc>`` root). XML is converted up front so
+    the rest of the pipeline only ever sees a Foundry-shaped dnd5e actor dict.
+    """
+    text = actor_path.read_text(encoding="utf-8")
+    if actor_path.suffix.lower() == ".xml" or fightclub.looks_like_fightclub(text):
+        return fightclub.parse_actor(text)
+    return json.loads(text)
+
+
 def write_output(
     actor_path: Path,
     output_dir: Path,
@@ -5786,7 +5800,7 @@ def write_output(
     paper: str = "a4",
     system: str | None = None,
 ) -> list[Path]:
-    actor = json.loads(actor_path.read_text(encoding="utf-8"))
+    actor = load_actor_file(actor_path)
     adapter = systems.detect_adapter(actor, forced=system)
     context = adapter.build_context(actor)
     sheet_id = slugify(actor.get("name", actor_path.stem))
@@ -5897,6 +5911,11 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--all-themes", action="store_true", help="Render one HTML per registered theme")
+    parser.add_argument(
+        "--to-fightclub",
+        action="store_true",
+        help="Convert the actor to a Lion's Den Fight Club 5e XML file (written to the output dir) instead of rendering a sheet",
+    )
     parser.add_argument("--pdf", action="store_true", help="Also generate a PDF using local Chromium")
     parser.add_argument("--chromium", help="Explicit Chromium executable path")
     parser.add_argument("--print-browser", dest="chromium", help="Explicit Chromium-compatible browser path for PDF export")
@@ -5917,6 +5936,18 @@ def main() -> int:
         import webui
         return webui.run(port=args.port, output_dir=args.output_dir, open_browser=not args.no_browser)
     args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.to_fightclub:
+        try:
+            actor = load_actor_file(args.actor_json)
+        except fightclub.FightClubParseError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        xml_path = args.output_dir / f"{slugify(actor.get('name', args.actor_json.stem))}.xml"
+        xml_path.write_text(fightclub.to_xml(actor), encoding="utf-8")
+        print(f"Fight Club XML written to {xml_path}")
+        return 0
+
     try:
         html_paths = write_output(
             args.actor_json,
