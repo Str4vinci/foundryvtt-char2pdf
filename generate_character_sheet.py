@@ -23,7 +23,7 @@ import fightclub
 import systems
 
 
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 APP_STORAGE_VERSION = APP_VERSION.replace(".", "-")
 
 ABILITY_ORDER = ["str", "dex", "con", "int", "wis", "cha"]
