@@ -115,6 +115,22 @@ class GenerationSmokeTests(unittest.TestCase):
 
         self.assertEqual(sheet.detect_print_browser(which=lambda _: None, exists=fake_exists), str(wanted))
 
+    def test_print_browser_detection_finds_other_chromium_browsers(self) -> None:
+        wanted = Path("/Applications/Helium.app/Contents/MacOS/Helium")
+
+        def fake_exists(path: Path) -> bool:
+            return path == wanted
+
+        self.assertEqual(sheet.detect_print_browser(which=lambda _: None, exists=fake_exists), str(wanted))
+
+    def test_print_browser_detection_checks_user_applications_dir(self) -> None:
+        wanted = Path.home() / "Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
+
+        def fake_exists(path: Path) -> bool:
+            return path == wanted
+
+        self.assertEqual(sheet.detect_print_browser(which=lambda _: None, exists=fake_exists), str(wanted))
+
 
 if __name__ == "__main__":
     unittest.main()
