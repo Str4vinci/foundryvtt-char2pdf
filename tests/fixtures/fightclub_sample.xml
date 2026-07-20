@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hand-authored, sanitized Fight Club 5e / Game Master 5 export used only for
+  tests. It contains NO copyrighted rules text - descriptions are placeholders.
+  A level-3 Cleric, chosen to exercise a normal per-level spellcaster with saves,
+  skills, armor + shield, a tracker-backed feature, and prepared spells.
+
+  Expected derived values (asserted in tests/test_fightclub.py):
+    abilities  STR 10, DEX 12, CON 15, INT 13, WIS 18, CHA 8
+               (base 10,12,14,13,16,8 + racial +1 CON, +2 WIS)
+    saves      proficient: WIS, CHA
+    skills     proficient: Insight, Religion (class), Medicine, Persuasion (bg)
+    class      Cleric 3 ; spellcasting ability WIS
+    slots      4 first-level, 2 second-level
+    AC         16  (Chain Shirt 13 medium +1 Dex cap-2, + Shield 2)
+-->
+<pc version="5"><character>
+  <name>Test Cleric</name>
+  <abilities>10,12,14,13,16,8,</abilities>
+  <hpMax>21</hpMax>
+  <hpCurrent>18</hpCurrent>
+  <xp>900</xp>
+  <race>
+    <name>Test Dwarf</name>
+    <feat><name>Darkvision</name><text>Placeholder trait text.</text></feat>
+    <mod><category>1</category><type>2</type><value>1</value></mod>
+    <mod><category>1</category><type>4</type><value>2</value></mod>
+  </race>
+  <background>
+    <name>Acolyte</name>
+    <proficiency>109</proficiency>
+    <proficiency>113</proficiency>
+    <feat><name>Shelter of the Faithful</name><text>Placeholder background feature.</text></feat>
+  </background>
+  <class>
+    <name>Cleric</name>
+    <level>3</level>
+    <hd>3</hd>
+    <spellAbility>4</spellAbility>
+    <proficiency>4</proficiency>
+    <proficiency>5</proficiency>
+    <proficiency>106</proficiency>
+    <proficiency>114</proficiency>
+    <slots>0,4,2,0,0,0,0,0,0,0,</slots>
+    <slotsCurrent>0,4,2,0,0,0,0,0,0,0,</slotsCurrent>
+    <feat><name>Channel Divinity</name><text>Placeholder feature text.</text></feat>
+    <feat><name>Spellcasting</name><text>Placeholder feature text.</text></feat>
+    <tracker><label>Channel Divinity</label><type>1</type><resetType>1</resetType><value>1</value><formula>2</formula></tracker>
+    <spell><name>Sacred Flame</name><school>5</school><level>0</level></spell>
+    <spell><name>Guidance</name><school>3</school><level>0</level></spell>
+    <spell><name>Cure Wounds</name><school>5</school><level>1</level><prepared>1</prepared></spell>
+    <spell><name>Bless</name><school>4</school><level>1</level><prepared>1</prepared></spell>
+    <spell><name>Spiritual Weapon</name><school>5</school><level>2</level><prepared>1</prepared></spell>
+  </class>
+  <item><name>Chain Shirt</name><type>1</type><ac>13</ac><weight>20</weight><value>50.0</value></item>
+  <item><name>Shield</name><type>1</type><ac>2</ac><weight>6.0</weight></item>
+  <item><name>Mace</name><type>5</type><weight>4</weight><value>5.0</value></item>
+  <item><name>Holy Symbol</name><type>14</type><weight>1.0</weight></item>
+  <money>15.0</money>
+</character></pc>

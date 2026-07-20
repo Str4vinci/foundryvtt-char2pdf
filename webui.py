@@ -20,6 +20,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import fightclub
 import generate_character_sheet as gen
 import systems
 
@@ -236,14 +237,22 @@ class Handler(BaseHTTPRequestHandler):
         self._send(HTTPStatus.OK, html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _handle_actor(self) -> None:
-        try:
-            actor = json.loads(self._body() or b"{}")
-        except json.JSONDecodeError as exc:
-            self._err(HTTPStatus.BAD_REQUEST, f"That file is not valid JSON: {exc}")
-            return
-        if not isinstance(actor, dict):
-            self._err(HTTPStatus.BAD_REQUEST, "Expected a Foundry actor JSON object.")
-            return
+        raw = (self._body() or b"").decode("utf-8", errors="replace")
+        if fightclub.looks_like_fightclub(raw):
+            try:
+                actor = fightclub.parse_actor(raw)
+            except fightclub.FightClubParseError as exc:
+                self._err(HTTPStatus.BAD_REQUEST, str(exc))
+                return
+        else:
+            try:
+                actor = json.loads(raw or "{}")
+            except json.JSONDecodeError as exc:
+                self._err(HTTPStatus.BAD_REQUEST, f"That file is not valid JSON or Fight Club XML: {exc}")
+                return
+            if not isinstance(actor, dict):
+                self._err(HTTPStatus.BAD_REQUEST, "Expected a Foundry actor JSON object or Fight Club XML.")
+                return
         try:
             summary = load_actor(actor)
         except systems.UnsupportedSystemError as exc:
@@ -459,9 +468,9 @@ _PAGE = r"""<!doctype html>
     <div id="banner" class="banner"></div>
 
     <div id="drop">
-      <div class="big">Drop actor JSON here</div>
-      <div class="small">or click to choose &mdash; stays on your computer</div>
-      <input id="file" type="file" accept=".json,application/json" hidden>
+      <div class="big">Drop actor JSON or XML here</div>
+      <div class="small">Foundry VTT JSON or Fight Club 5e XML &mdash; stays on your computer</div>
+      <input id="file" type="file" accept=".json,application/json,.xml,text/xml,application/xml" hidden>
     </div>
 
     <div class="actor" id="actor">
