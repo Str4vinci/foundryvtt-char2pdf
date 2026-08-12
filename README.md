@@ -6,7 +6,7 @@ Current support is for Foundry's `dnd5e` system, including D&D 2024-style charac
 
 It also reads and writes **Lion's Den "Fight Club 5e" / "Game Master 5" XML** (the format those mobile apps use). Fight Club characters are D&D 5e too, so they render through the same engine — every theme, color mode, paper size, and the web UI work identically — and any character can be converted back out to Fight Club XML with `--to-fightclub`. See [Fight Club 5e XML](#fight-club-5e-xml).
 
-Current release: `v0.4.0`
+Current release: `v0.4.0` — see the [changelog](CHANGELOG.md) for what changed in each release.
 
 ## Screenshots
 
@@ -175,6 +175,7 @@ Issues and pull requests are welcome.
 - Open an issue first for anything non-trivial so the approach can be agreed before code is written.
 - Keep the generator dependency-free: the Python side must run on the standard library only. Browser/PDF tooling is the only external runtime requirement.
 - Match the existing code style. Small, focused PRs are easier to review than sweeping changes.
+- Add a `CHANGELOG.md` entry under `## [Unreleased]` for anything users would notice.
 - When fixing a rendering bug, include a sanitized actor JSON (or a minimal repro) that triggers it.
 - Do not commit private actor exports, generated `output/`, or third-party copyrighted artwork.
 - New themes should add an entry to `THEMES` in `generate_character_sheet.py` and follow the existing `light_accent` / `dark_accent` pattern.
