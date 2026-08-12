@@ -6,7 +6,7 @@ Current support is for Foundry's `dnd5e` system, including D&D 2024-style charac
 
 It also reads and writes **Lion's Den "Fight Club 5e" / "Game Master 5" XML** (the format those mobile apps use). Fight Club characters are D&D 5e too, so they render through the same engine — every theme, color mode, paper size, and the web UI work identically — and any character can be converted back out to Fight Club XML with `--to-fightclub`. See [Fight Club 5e XML](#fight-club-5e-xml).
 
-Current release: `v0.3.0`
+Current release: `v0.4.0`
 
 ## Screenshots
 
