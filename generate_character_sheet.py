@@ -222,13 +222,33 @@ def resolve_formula(raw: Any, ctx: dict[str, int]) -> int:
         return int(round(raw))
     if not isinstance(raw, str):
         return 0
+
+    def substitute_ref(match: "re.Match[str]") -> str:
+        """Replace one ``@reference`` with its value from ``ctx``.
+
+        Foundry writes glued arithmetic like ``@abilities.int.mod-1`` without
+        spaces, and the reference pattern would otherwise swallow the ``-1``
+        as part of the name. When the full reference is unknown, retry without
+        a trailing ``-<number>`` before giving up, so the suffix stays in the
+        expression as subtraction.
+        """
+        ref = match.group(0)
+        if ref in ctx:
+            return str(ctx[ref])
+        split = re.fullmatch(r"(.+)-(\d+)", ref)
+        if split:
+            base = split.group(1)
+            if base in ctx:
+                return f"{ctx[base]}-{split.group(2)}"
+        return "0"
+
     expr = raw.strip()
     if not expr:
         return 0
-    if expr.lstrip("-").isdigit():
-        return int(expr)
-    expr = re.sub(r"@[\w.\-]+", lambda m: str(ctx.get(m.group(0), 0)), expr)
     try:
+        if expr.lstrip("-").isdigit():
+            return int(expr)
+        expr = re.sub(r"@[\w.\-]+", substitute_ref, expr)
         return int(round(_eval_formula_node(ast.parse(expr, mode="eval"))))
     except Exception:
         return 0
@@ -4028,9 +4048,17 @@ def write_output(
             for name, entry in THEMES.items()
         ]
 
-    resolved = resolve_theme_entry(theme) if theme else resolve_theme_entry(adapter.default_theme(actor))
+    if theme:
+        # An explicitly requested theme must resolve; a bad name is a user error.
+        resolved = resolve_theme_entry(theme)
+    else:
+        try:
+            resolved = resolve_theme_entry(adapter.default_theme(actor))
+        except ValueError:
+            resolved = None
     if resolved is None:
-        # No actor class detected and no --theme passed → fall back to ledger
+        # No actor class, or one without a dedicated palette (homebrew classes
+        # have no registered theme) → fall back to the neutral ledger layout.
         resolved = ("ledger", dict(THEMES["ledger"]))
     label, entry = resolved
     return [_render_one_theme(context, sheet_id, output_dir, label, entry, mode, include_footer=include_footer, paper=paper, adapter=adapter)]

@@ -16,6 +16,18 @@ this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Formulas glued to a reference (e.g. `@abilities.int.mod-1`, `@prof-1`) no longer
+  swallow the trailing `-N` as part of the reference name, which made resource
+  pip counts silently evaluate to zero. Spaced formulas and hyphenated
+  references (`@scale.bard.inspiration`) behave exactly as before.
+- Malformed numeric formulas such as `--5` in an export's `uses.max` no longer
+  crash the generator; they now resolve to `0` like other unparseable formulas.
+- Characters whose primary class has no dedicated theme (e.g. homebrew classes)
+  render with the neutral `ledger` layout instead of crashing with a traceback.
+  An explicit `--theme not-a-theme` remains a loud error.
+
 ### Removed
 
 - Three superseded page renderers and their helpers, left behind by earlier layout
