@@ -23,6 +23,20 @@ class FightClubImportTests(unittest.TestCase):
         with self.assertRaises(fightclub.FightClubParseError):
             fightclub.parse_actor("<html><body>not a character</body></html>")
 
+    def test_rejects_doctype_and_entity_declarations(self) -> None:
+        # Real exports never carry a DTD; entity expansion is a DoS vector.
+        bomb = (
+            '<!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;&lol;">]>'
+            "<pc version=\"5\"><character></character></pc>"
+        )
+        with self.assertRaises(fightclub.FightClubParseError):
+            fightclub.parse_actor(bomb)
+
+    def test_rejects_entity_bomb_without_doctype_keyword(self) -> None:
+        sneaky = '<!ENTITY lol "lol"><pc version="5"><character/></pc>'
+        with self.assertRaises(fightclub.FightClubParseError):
+            fightclub.parse_actor(sneaky)
+
     def test_identity(self) -> None:
         self.assertEqual(self.actor["name"], "Test Cleric")
         self.assertEqual(self.actor["type"], "character")

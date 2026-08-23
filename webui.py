@@ -46,6 +46,18 @@ class _State:
 
 STATE = _State()
 
+# The server is threaded, so every read/write of STATE goes through this lock.
+# Slow work (parsing, rendering) happens outside it; only the swap of the five
+# related fields — or the snapshot a request renders from — is atomic, so two
+# tabs can never mix one actor's context with another's adapter.
+_LOCK = threading.RLock()
+
+
+def _snapshot_state() -> tuple[dict | None, systems.SystemAdapter, str, str]:
+    """Atomically read (context, adapter, sheet_id, default_theme) for one render."""
+    with _LOCK:
+        return STATE.context, STATE.adapter, STATE.sheet_id, STATE.default_theme
+
 
 def load_actor(actor: dict) -> dict:
     """Parse an uploaded actor dict into a render context and store it.
@@ -57,15 +69,19 @@ def load_actor(actor: dict) -> dict:
     adapter = systems.detect_adapter(actor)
     context = adapter.build_context(actor)
     default = adapter.default_theme(actor) or "ledger"
-    STATE.adapter = adapter
-    STATE.context = context
-    STATE.sheet_id = gen.slugify(actor.get("name", "sheet"))
-    STATE.name = actor.get("name") or "Unnamed Character"
-    STATE.default_theme = default if default in gen.THEMES else "ledger"
+    default = default if default in gen.THEMES else "ledger"
+    name = actor.get("name") or "Unnamed Character"
+    sheet_id = gen.slugify(actor.get("name", "sheet"))
+    with _LOCK:
+        STATE.adapter = adapter
+        STATE.context = context
+        STATE.sheet_id = sheet_id
+        STATE.name = name
+        STATE.default_theme = default
     return {
-        "name": STATE.name,
-        "sheet_id": STATE.sheet_id,
-        "default_theme": STATE.default_theme,
+        "name": name,
+        "sheet_id": sheet_id,
+        "default_theme": default,
         "class_line": context.get("class_line", ""),
     }
 
@@ -109,12 +125,13 @@ def render_preview(theme: str, mode: str | None, paper: str = "a4") -> str:
     (authoritatively) via the iframe's `?theme=<mode>` query, which the sheet's
     own script honors as an override.
     """
-    if STATE.context is None:
+    context, adapter, sheet_id, _default = _snapshot_state()
+    if context is None:
         raise ValueError("No actor loaded.")
     _, entry = _resolve(theme)
-    html = STATE.adapter.render(
-        STATE.context,
-        STATE.sheet_id,
+    html = adapter.render(
+        context,
+        sheet_id,
         style=entry["base"],
         initial_theme=mode,
         theme_palette=_palette(entry),
@@ -136,13 +153,14 @@ def generate_files(theme: str, mode: str | None, paper: str, footer: bool,
     HTML always succeeds when an actor is loaded; PDF failures are reported
     softly so the HTML download still works.
     """
-    if STATE.context is None:
+    context, adapter, sheet_id, _default_theme = _snapshot_state()
+    if context is None:
         raise ValueError("No actor loaded.")
     output_dir.mkdir(parents=True, exist_ok=True)
     label, entry = _resolve(theme)
     html_path = gen._render_one_theme(
-        STATE.context, STATE.sheet_id, output_dir, label, dict(entry), mode,
-        include_footer=footer, paper=paper, adapter=STATE.adapter,
+        context, sheet_id, output_dir, label, dict(entry), mode,
+        include_footer=footer, paper=paper, adapter=adapter,
     )
     result: dict = {"html": html_path.name, "theme": label}
     if want_pdf:
@@ -163,8 +181,23 @@ def generate_files(theme: str, mode: str | None, paper: str, footer: bool,
 # --------------------------------------------------------------------------- #
 # HTTP handler
 # --------------------------------------------------------------------------- #
+# Uploads are actor exports; even huge Foundry campaigns stay far below this.
+MAX_BODY_BYTES = 64 * 1024 * 1024
+
+
+class _BodyError(ValueError):
+    """The request's Content-Length header is malformed or negative."""
+
+
+class _BodyTooLarge(_BodyError):
+    """The request body exceeds MAX_BODY_BYTES."""
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = f"char2pdf-webui/{gen.APP_VERSION}"
+    # Socket timeout for reads/writes, so a client that stalls mid-request
+    # cannot pin a handler thread (and the shared state) forever.
+    timeout = 60
 
     # -- helpers ----------------------------------------------------------- #
     def _send(self, status: int, body: bytes,
@@ -185,8 +218,36 @@ class Handler(BaseHTTPRequestHandler):
     def _err(self, status: int, message: str) -> None:
         self._json({"error": message}, status=status)
 
+    def _foreign_origin(self) -> bool:
+        """True when the request did not come from this server's own origin.
+
+        The UI is a single-user localhost app, but a hostile web page can
+        reach it anyway: browsers send cross-site POSTs to 127.0.0.1 without
+        a CORS preflight ("simple requests"), and DNS rebinding can point a
+        public hostname at the loopback so the attacker can also read
+        responses. Both are defeated by requiring that the Host header names
+        this exact server and that any Origin header matches it.
+        """
+        allowed = getattr(self.server, "allowed_hosts", None)
+        host = self.headers.get("Host", "")
+        if not allowed or not host or host.lower() not in allowed:
+            return True
+        origin = self.headers.get("Origin")
+        if origin:
+            return urlparse(origin).netloc.lower() != host.lower()
+        return False
+
     def _body(self) -> bytes:
-        length = int(self.headers.get("Content-Length") or 0)
+        raw_len = self.headers.get("Content-Length")
+        try:
+            length = int(raw_len) if raw_len else 0
+        except ValueError:
+            raise _BodyError("Invalid Content-Length header.") from None
+        if length < 0:
+            raise _BodyError("Invalid Content-Length header.")
+        mib = MAX_BODY_BYTES // (1024 * 1024)
+        if length > MAX_BODY_BYTES:
+            raise _BodyTooLarge(f"Upload exceeds the {mib} MiB limit.")
         return self.rfile.read(length) if length else b""
 
     def log_message(self, *args) -> None:  # keep the console quiet
@@ -194,6 +255,9 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- routes ------------------------------------------------------------ #
     def do_GET(self) -> None:
+        if self._foreign_origin():
+            self._err(HTTPStatus.FORBIDDEN, "Cross-origin requests are not allowed.")
+            return
         parsed = urlparse(self.path)
         route = parsed.path
         if route == "/":
@@ -208,6 +272,9 @@ class Handler(BaseHTTPRequestHandler):
             self._err(HTTPStatus.NOT_FOUND, "Not found.")
 
     def do_POST(self) -> None:
+        if self._foreign_origin():
+            self._err(HTTPStatus.FORBIDDEN, "Cross-origin requests are not allowed.")
+            return
         route = urlparse(self.path).path
         if route == "/actor":
             self._handle_actor()
@@ -216,8 +283,18 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._err(HTTPStatus.NOT_FOUND, "Not found.")
 
+    def _read_body(self) -> bytes | None:
+        """Read and validate the request body; on failure respond and return None."""
+        try:
+            return self._body()
+        except _BodyTooLarge as exc:
+            self._err(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, str(exc))
+        except _BodyError as exc:
+            self._err(HTTPStatus.BAD_REQUEST, str(exc))
+        return None
+
     def _handle_preview(self, query: dict) -> None:
-        if STATE.context is None:
+        if _snapshot_state()[0] is None:
             self._err(HTTPStatus.BAD_REQUEST, "Upload an actor first.")
             return
         # `palette` = which theme to render; `theme` = color mode (so the sheet's
@@ -237,7 +314,10 @@ class Handler(BaseHTTPRequestHandler):
         self._send(HTTPStatus.OK, html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _handle_actor(self) -> None:
-        raw = (self._body() or b"").decode("utf-8", errors="replace")
+        raw_bytes = self._read_body()
+        if raw_bytes is None:
+            return
+        raw = raw_bytes.decode("utf-8", errors="replace")
         if fightclub.looks_like_fightclub(raw):
             try:
                 actor = fightclub.parse_actor(raw)
@@ -264,11 +344,14 @@ class Handler(BaseHTTPRequestHandler):
         self._json(summary)
 
     def _handle_generate(self) -> None:
-        if STATE.context is None:
+        if _snapshot_state()[0] is None:
             self._err(HTTPStatus.BAD_REQUEST, "Upload an actor first.")
             return
+        raw_body = self._read_body()
+        if raw_body is None:
+            return
         try:
-            opts = json.loads(self._body() or b"{}")
+            opts = json.loads(raw_body or b"{}")
         except json.JSONDecodeError as exc:
             self._err(HTTPStatus.BAD_REQUEST, f"Invalid request: {exc}")
             return
@@ -307,10 +390,22 @@ class Handler(BaseHTTPRequestHandler):
 # --------------------------------------------------------------------------- #
 def _make_server(host: str, port: int) -> ThreadingHTTPServer:
     try:
-        return ThreadingHTTPServer((host, port), Handler)
+        httpd = ThreadingHTTPServer((host, port), Handler)
     except OSError:
         # Requested port busy — let the OS pick a free one.
-        return ThreadingHTTPServer((host, 0), Handler)
+        httpd = ThreadingHTTPServer((host, 0), Handler)
+    bound_host, bound_port = httpd.server_address[:2]
+    allowed = {f"{bound_host}:{bound_port}"}
+    if str(bound_host).strip("[]").lower() in ("127.0.0.1", "::1"):
+        # Loopback bind: also accept the spellings a browser may use, but
+        # nothing else — this is what defeats DNS rebinding.
+        allowed.update({
+            f"127.0.0.1:{bound_port}",
+            f"localhost:{bound_port}",
+            f"[::1]:{bound_port}",
+        })
+    httpd.allowed_hosts = {value.lower() for value in allowed}
+    return httpd
 
 
 def run(port: int = 8765, output_dir: Path = Path("output"),

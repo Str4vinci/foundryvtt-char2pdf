@@ -16,6 +16,25 @@ this file.
 
 ## [Unreleased]
 
+### Security
+
+- The local web UI now rejects requests whose `Host` header does not name the
+  running server (defeats DNS rebinding against 127.0.0.1) and cross-site POSTs
+  carrying a foreign `Origin` header (defeats drive-by requests that could
+  replace or read the loaded character).
+- Fight Club XML containing DTD/entity declarations is rejected before parsing
+  instead of being expanded, closing an entity-expansion denial-of-service
+  vector for uploaded (and CLI-loaded) files.
+- Web UI request bodies are capped at 64 MiB; malformed or negative
+  `Content-Length` headers now get a clean 400 instead of stalling or killing
+  the request thread.
+
+### Changed
+
+- The web UI's shared upload state is now lock-protected and rendered from
+  atomic snapshots, so two browser tabs can no longer mix one actor's context
+  with another's during concurrent preview/generate requests.
+
 ### Removed
 
 - Three superseded page renderers and their helpers, left behind by earlier layout

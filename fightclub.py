@@ -406,8 +406,20 @@ def _build_feature_items(char: ET.Element) -> list[dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 # Top-level assembly
 # --------------------------------------------------------------------------- #
+_DTD_RE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+
+
 def parse_actor(xml_text: str) -> dict[str, Any]:
-    """Parse Fight Club 5e character XML into a Foundry-shaped dnd5e actor dict."""
+    """Parse Fight Club 5e character XML into a Foundry-shaped dnd5e actor dict.
+
+    DTD/entity declarations are rejected up front rather than handed to the
+    parser: real exports never carry them, and expanding crafted entities
+    ("billion laughs") can exhaust memory and CPU.
+    """
+    if _DTD_RE.search(xml_text):
+        raise FightClubParseError(
+            "This XML declares a DTD/entity section, which Fight Club exports never use."
+        )
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError as exc:
