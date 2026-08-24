@@ -238,7 +238,7 @@ def resolve_formula(raw: Any, ctx: dict[str, int]) -> int:
     if not isinstance(raw, str):
         return 0
 
-    def substitute_ref(match: "re.Match[str]") -> str:
+    def substitute_ref(match: re.Match[str]) -> str:
         """Replace one ``@reference`` with its value from ``ctx``.
 
         Foundry writes glued arithmetic like ``@abilities.int.mod-1`` without
