@@ -1,7 +1,9 @@
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import generate_character_sheet as sheet
 
@@ -165,6 +167,41 @@ class NullFieldRobustnessTests(unittest.TestCase):
             paths = sheet.write_output(actor_path, tmp_path)
             self.assertEqual(paths[0].name, "null-carrier-character-sheet-ledger.html")
             self.assertIn("<!doctype html>", paths[0].read_text(encoding="utf-8"))
+
+
+class PdfExportTests(unittest.TestCase):
+    def test_export_command_is_locked_down_and_timeout_bounded(self) -> None:
+        recorded = {}
+
+        def fake_run(command, **kwargs):
+            recorded["command"] = list(command)
+            recorded["timeout"] = kwargs.get("timeout")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with mock.patch.object(sheet.subprocess, "run", fake_run):
+            sheet.render_pdf(Path("sheet.html"), Path("sheet.pdf"), "chrome", mode="dark")
+
+        self.assertNotIn("--allow-file-access-from-files", recorded["command"])
+        self.assertEqual(recorded["timeout"], sheet.PDF_EXPORT_TIMEOUT_SECONDS)
+
+    def test_browser_failure_raises_with_stderr_tail(self) -> None:
+        def fake_run(command, **kwargs):
+            return subprocess.CompletedProcess(command, 1, stdout="", stderr="ERROR:gpu_init failed\nretrying")
+
+        with mock.patch.object(sheet.subprocess, "run", fake_run):
+            with self.assertRaises(sheet.PdfExportError) as ctx:
+                sheet.render_pdf(Path("sheet.html"), Path("sheet.pdf"), "chrome")
+        self.assertIn("status 1", str(ctx.exception))
+        self.assertIn("ERROR:gpu_init failed", str(ctx.exception))
+
+    def test_hung_browser_raises_friendly_timeout_error(self) -> None:
+        def fake_run(command, **kwargs):
+            raise subprocess.TimeoutExpired(cmd=command, timeout=120)
+
+        with mock.patch.object(sheet.subprocess, "run", fake_run):
+            with self.assertRaises(sheet.PdfExportError) as ctx:
+                sheet.render_pdf(Path("sheet.html"), Path("sheet.pdf"), "chrome")
+        self.assertIn("did not finish printing", str(ctx.exception))
 
 
 if __name__ == "__main__":

@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import threading
+import traceback
 import webbrowser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -209,14 +211,26 @@ class Handler(BaseHTTPRequestHandler):
         for key, value in (extra or {}).items():
             self.send_header(key, value)
         self.end_headers()
-        if self.command != "HEAD":
-            self.wfile.write(body)
+        self.wfile.write(body)
 
     def _json(self, obj, status: int = HTTPStatus.OK) -> None:
         self._send(status, json.dumps(obj).encode("utf-8"))
 
     def _err(self, status: int, message: str) -> None:
         self._json({"error": message}, status=status)
+
+    def _internal_error(self, exc: Exception, context: str) -> None:
+        """Report an unexpected failure without leaking internals to the client.
+
+        The full traceback goes to the server console; the browser gets a
+        generic message (exception text can contain absolute paths or other
+        machine details that mean nothing to — and help nobody attacking — the
+        local user).
+        """
+        print(f"char2pdf web UI: {context}:", file=sys.stderr)
+        traceback.print_exc()
+        self._err(HTTPStatus.INTERNAL_SERVER_ERROR,
+                  f"Something went wrong while {context}. Check the window this app runs in.")
 
     def _foreign_origin(self) -> bool:
         """True when the request did not come from this server's own origin.
@@ -309,7 +323,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             html = render_preview(theme, mode, paper)
         except Exception as exc:
-            self._err(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+            self._internal_error(exc, "rendering the preview")
             return
         self._send(HTTPStatus.OK, html.encode("utf-8"), "text/html; charset=utf-8")
 
@@ -369,7 +383,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             result = generate_files(theme, mode, paper, footer, want_pdf, OUTPUT_DIR)
         except Exception as exc:
-            self._err(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+            self._internal_error(exc, "generating the sheet")
             return
         self._json(result)
 
@@ -382,7 +396,18 @@ class Handler(BaseHTTPRequestHandler):
             return
         ctype = "application/pdf" if safe.lower().endswith(".pdf") else "text/html; charset=utf-8"
         self._send(HTTPStatus.OK, target.read_bytes(), ctype,
-                   {"Content-Disposition": f'attachment; filename="{safe}"'})
+                   {"Content-Disposition": f'attachment; filename="{_attachment_name(safe)}"'})
+
+
+def _attachment_name(name: str) -> str:
+    """Defensive filename for the Content-Disposition header.
+
+    Generated names come from ``slugify`` + validated theme labels, so this is
+    a no-op today — it keeps the header well-formed even if that invariant ever
+    slips (quotes/CR/LF in a header value would corrupt the response).
+    """
+    cleaned = "".join(ch if ch.isalnum() or ch in ".-_" else "_" for ch in name).strip("._")
+    return cleaned or "download"
 
 
 # --------------------------------------------------------------------------- #
@@ -428,14 +453,22 @@ def run(port: int = 8765, output_dir: Path = Path("output"),
     return 0
 
 
+def make_arg_parser(description: str, default_output_dir: Path | None = None) -> argparse.ArgumentParser:
+    """Argument parser shared by `webui.py` and the desktop launcher."""
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("--port", type=int, default=8765,
+                        help="Port to serve on (default: %(default)s)")
+    parser.add_argument("--output-dir", type=Path, default=default_output_dir or Path("output"),
+                        help="Where generated files are written (default: %(default)s)")
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="Bind address (default: %(default)s)")
+    parser.add_argument("--no-browser", action="store_true",
+                        help="Do not auto-open the browser")
+    return parser
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=8765, help="Port to serve on (default: 8765)")
-    parser.add_argument("--output-dir", type=Path, default=Path("output"),
-                        help="Where generated files are written (default: output)")
-    parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
-    parser.add_argument("--no-browser", action="store_true", help="Do not auto-open the browser")
-    return parser.parse_args()
+    return make_arg_parser(__doc__).parse_args()
 
 
 def main() -> int:

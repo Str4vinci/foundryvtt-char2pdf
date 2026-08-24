@@ -18,6 +18,14 @@ this file.
 
 ### Changed
 
+- PDF export no longer passes `--allow-file-access-from-files` to the browser
+  (the generated sheet is self-contained; file:// read access stays locked
+  down). A failing or hung browser now raises a clear error that includes the
+  browser's last stderr lines — surfaced as a soft warning in the web UI's PDF
+  download panel and a clean `error:` line in the CLI instead of a traceback.
+  Headless printing is bounded by a 120-second timeout.
+- The desktop launcher reuses the web UI's argument parser instead of
+  duplicating it; both now document their live defaults via `%(...)s`.
 - CI now runs the test suite on Python 3.10–3.13 (plus 3.10 on Windows and
   macOS), lints with ruff (`ruff.toml`), compiles every Python module instead
   of a hand-maintained list, and drops a leftover "no tests yet" guard.
@@ -47,6 +55,10 @@ this file.
 - The web UI's shared upload state is now lock-protected and rendered from
   atomic snapshots, so two browser tabs can no longer mix one actor's context
   with another's during concurrent preview/generate requests.
+- Unexpected web UI failures now return a generic message with the traceback on
+  the server console, instead of echoing raw exception text (which could contain
+  absolute paths) to the browser. Download filenames are defensively sanitized
+  for the `Content-Disposition` header.
 
 ### Removed
 

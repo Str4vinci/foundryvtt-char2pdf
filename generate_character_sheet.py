@@ -4111,6 +4111,21 @@ def detect_print_browser(
     return None
 
 
+class PdfExportError(RuntimeError):
+    """Raised when headless-browser PDF export fails or times out."""
+
+
+def _log_tail(text: str | None, lines: int = 5) -> str:
+    """Last few non-blank lines of a log, joined — for error messages."""
+    relevant = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    return " | ".join(relevant[-lines:])
+
+
+# Headless browsers normally print within seconds; a hung browser must not
+# wedge a caller (the web UI serves requests on threads).
+PDF_EXPORT_TIMEOUT_SECONDS = 120
+
+
 def render_pdf(html_path: Path, pdf_path: Path, browser: str, mode: str | None = None) -> None:
     target_uri = html_path.resolve().as_uri()
     if mode:
@@ -4119,14 +4134,30 @@ def render_pdf(html_path: Path, pdf_path: Path, browser: str, mode: str | None =
         browser,
         "--headless",
         "--disable-gpu",
+        # Kept for compatibility (root/container runs need it); the sheet is
+        # self-contained, and file:// access stays locked down below.
         "--no-sandbox",
-        "--allow-file-access-from-files",
         "--virtual-time-budget=1500",
         "--no-pdf-header-footer",
         f"--print-to-pdf={pdf_path}",
         target_uri,
     ]
-    subprocess.run(command, check=True, capture_output=True, text=True)
+    try:
+        result = subprocess.run(command, check=False, capture_output=True, text=True,
+                                timeout=PDF_EXPORT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        stderr = exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else exc.stderr
+        detail = _log_tail(stderr)
+        raise PdfExportError(
+            f"{Path(browser).name} did not finish printing within "
+            f"{PDF_EXPORT_TIMEOUT_SECONDS}s." + (f" {detail}" if detail else "")
+        ) from exc
+    if result.returncode != 0:
+        detail = _log_tail(result.stderr)
+        raise PdfExportError(
+            f"{Path(browser).name} exited with status {result.returncode} while printing."
+            + (f" {detail}" if detail else "")
+        )
 
 
 def parse_theme_arg(value: str) -> str:
@@ -4226,7 +4257,11 @@ def main() -> int:
             return 1
         for path in html_paths:
             pdf_path = path.with_suffix(".pdf")
-            render_pdf(path, pdf_path, browser, mode=args.mode)
+            try:
+                render_pdf(path, pdf_path, browser, mode=args.mode)
+            except PdfExportError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 1
             print(f"PDF written to {pdf_path}")
 
     return 0

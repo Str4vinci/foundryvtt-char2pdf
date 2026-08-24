@@ -195,6 +195,32 @@ class ServerTests(unittest.TestCase):
         status, _, _ = self._req("POST", "/actor", req_headers={"Content-Length": "-5"})
         self.assertEqual(status, 400)
 
+    def test_internal_error_is_generic_and_does_not_leak_internals(self) -> None:
+        self._req("POST", "/actor", json.dumps(MINIMAL_ACTOR))
+        original = webui.gen._render_one_theme
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("secret /home/leo/absolute/path")
+
+        webui.gen._render_one_theme = boom
+        try:
+            status, _, body = self._req("POST", "/generate", json.dumps({"theme": "ledger"}))
+        finally:
+            webui.gen._render_one_theme = original
+        self.assertEqual(status, 500)
+        self.assertNotIn(b"secret", body)
+        self.assertNotIn(b"/home/leo", body)
+        self.assertIn(b"Something went wrong", body)
+
+
+class AttachmentNameTests(unittest.TestCase):
+    def test_header_breaking_characters_are_neutralized(self) -> None:
+        for nasty in ('a"b\r\nc', "../../etc/passwd", "sheet?.html", ""):
+            with self.subTest(name=nasty):
+                cleaned = webui._attachment_name(nasty)
+                self.assertTrue(all(ch.isalnum() or ch in ".-_" for ch in cleaned))
+                self.assertNotEqual(cleaned, "")
+
 
 if __name__ == "__main__":
     unittest.main()
