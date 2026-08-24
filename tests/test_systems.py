@@ -4,10 +4,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import generate_character_sheet as gen
-import systems
 from test_smoke import MINIMAL_ACTOR
 
+import generate_character_sheet as gen
+import systems
 
 # A deliberately non-dnd5e actor: a plausible Pathfinder 2e-shaped export whose
 # ability block does not carry the dnd5e str/dex/con/int/wis/cha fingerprint.

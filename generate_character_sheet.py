@@ -22,7 +22,6 @@ from typing import Any
 import fightclub
 import systems
 
-
 APP_VERSION = "0.4.0"
 APP_STORAGE_VERSION = APP_VERSION.replace(".", "-")
 
@@ -160,6 +159,16 @@ def to_int(value: Any, default: int = 0) -> int:
     return int(round(to_number(value, default)))
 
 
+def _mapping(value: Any) -> dict[str, Any]:
+    """Return ``value`` when it is a dict, else an empty dict.
+
+    Exports are machine-written, but hand-edited copies exist: a field that is
+    present yet null must be tolerated exactly like a missing one instead of
+    crashing derivation.
+    """
+    return value if isinstance(value, dict) else {}
+
+
 def is_spendable_resource(entry: dict[str, Any]) -> bool:
     if to_int(entry.get("uses_max")) < 1:
         return False
@@ -201,12 +210,18 @@ def _eval_formula_node(node: ast.AST) -> float:
     if isinstance(node, ast.BinOp):
         left = _eval_formula_node(node.left)
         right = _eval_formula_node(node.right)
-        if isinstance(node.op, ast.Add): return left + right
-        if isinstance(node.op, ast.Sub): return left - right
-        if isinstance(node.op, ast.Mult): return left * right
-        if isinstance(node.op, ast.Div): return left / right if right else 0.0
-        if isinstance(node.op, ast.FloorDiv): return left // right if right else 0.0
-        if isinstance(node.op, ast.Mod): return left % right if right else 0.0
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.Div):
+            return left / right if right else 0.0
+        if isinstance(node.op, ast.FloorDiv):
+            return left // right if right else 0.0
+        if isinstance(node.op, ast.Mod):
+            return left % right if right else 0.0
         raise ValueError("unsupported binop")
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Name) or node.func.id not in _FORMULA_FUNCS or node.keywords:
@@ -482,7 +497,7 @@ def total_weight(items: list[dict[str, Any]]) -> float:
 
 
 def find_items(actor: dict[str, Any], item_type: str) -> list[dict[str, Any]]:
-    return [item for item in actor.get("items", []) if item.get("type") == item_type]
+    return [item for item in actor.get("items") or [] if item.get("type") == item_type]
 
 
 def human_school(code: str) -> str:
@@ -614,12 +629,12 @@ def format_damage(weapon: dict[str, Any], ability_bonus: int) -> str:
 
 def derive_armor_class(actor: dict[str, Any], dex_mod: int) -> int:
     equipped = [
-        item for item in actor.get("items", [])
-        if item.get("type") == "equipment" and item.get("system", {}).get("equipped")
+        item for item in actor.get("items") or []
+        if item.get("type") == "equipment" and _mapping(item.get("system")).get("equipped")
     ]
-    armor_items = [item for item in equipped if item.get("system", {}).get("type", {}).get("value") != "shield"]
+    armor_items = [item for item in equipped if _mapping(_mapping(item.get("system")).get("type")).get("value") != "shield"]
     shield_bonus = sum(
-        to_int(item.get("system", {}).get("armor", {}).get("value"))
+        to_int(_mapping(_mapping(item.get("system")).get("armor")).get("value"))
         for item in equipped
         if item.get("system", {}).get("type", {}).get("value") == "shield"
     )
@@ -640,10 +655,10 @@ def spell_slot_defaults(spells_data: dict[str, Any]) -> list[dict[str, Any]]:
     slots = []
     for level in range(1, 10):
         key = f"spell{level}"
-        value = spells_data.get(key, {}).get("value", 0)
+        value = _mapping(spells_data.get(key)).get("value", 0)
         if value:
             slots.append({"label": f"Level {level}", "value": int(value)})
-    pact = spells_data.get("pact", {}).get("value", 0)
+    pact = _mapping(spells_data.get("pact")).get("value", 0)
     if pact:
         slots.append({"label": "Pact", "value": int(pact)})
     return slots
@@ -732,7 +747,7 @@ def _collapse_scaling_variants(entries: list[dict[str, Any]]) -> list[dict[str, 
             base_of.append(ident)
             tier_of.append(0)
     max_tier: dict[str, int] = {}
-    for base, tier in zip(base_of, tier_of):
+    for base, tier in zip(base_of, tier_of, strict=True):
         if base is None:
             continue
         if tier > max_tier.get(base, 0):
@@ -805,36 +820,38 @@ def collect_features(
 
 
 def sheet_context(actor: dict[str, Any]) -> dict[str, Any]:
-    system = actor.get("system", {})
-    details = system.get("details", {})
-    abilities = system.get("abilities", {})
-    skills = system.get("skills", {})
-    tools = system.get("tools", {})
-    traits = system.get("traits", {})
+    system = _mapping(actor.get("system"))
+    details = _mapping(system.get("details"))
+    abilities = _mapping(system.get("abilities"))
+    skills = _mapping(system.get("skills"))
+    tools = _mapping(system.get("tools"))
+    traits = _mapping(system.get("traits"))
     class_info = class_levels(actor)
     total_level = sum(entry["levels"] for entry in class_info)
     prof_bonus = proficiency_bonus(total_level)
-    spell_ability_code = system.get("attributes", {}).get("spellcasting") or (class_info[0]["item"].get("system", {}).get("spellcasting", {}).get("ability") if class_info else "")
+    spell_ability_code = _mapping(system.get("attributes")).get("spellcasting") or (_mapping(_mapping(class_info[0]["item"]).get("system")).get("spellcasting", {}).get("ability") if class_info else "")
 
     race_item = next(iter(find_items(actor, "race")), None)
     background_item = next(iter(find_items(actor, "background")), None)
     subclass_item = next(iter(find_items(actor, "subclass")), None)
     class_item = class_info[0]["item"] if class_info else None
-    armor_items = [item for item in actor.get("items", []) if item.get("type") in {"equipment", "weapon", "loot", "tool", "container"}]
+    all_items = actor.get("items") or []
+    armor_items = [item for item in all_items if item.get("type") in {"equipment", "weapon", "loot", "tool", "container"}]
     equipped_shields = [
-        item for item in actor.get("items", [])
+        item for item in all_items
         if item.get("type") == "equipment"
-        and item.get("system", {}).get("equipped")
-        and item.get("system", {}).get("type", {}).get("value") == "shield"
+        and _mapping(item.get("system")).get("equipped")
+        and _mapping(_mapping(item.get("system")).get("type")).get("value") == "shield"
     ]
     ability_rows = []
     saving_throw_rows = []
 
     for code in ABILITY_ORDER:
-        score = to_int(abilities.get(code, {}).get("value"))
+        ability = _mapping(abilities.get(code))
+        score = to_int(ability.get("value"))
         mod = ability_mod(score)
-        save_prof = to_number(abilities.get(code, {}).get("proficient"))
-        save_bonus = mod + int(prof_bonus * save_prof) + to_int(abilities.get(code, {}).get("bonuses", {}).get("save"))
+        save_prof = to_number(ability.get("proficient"))
+        save_bonus = mod + int(prof_bonus * save_prof) + to_int(_mapping(ability.get("bonuses")).get("save"))
         ability_rows.append({
             "code": code.upper(),
             "label": ABILITY_LABELS[code],
@@ -850,12 +867,12 @@ def sheet_context(actor: dict[str, Any]) -> dict[str, Any]:
     skill_rows = []
     passive_scores = {}
     for code, label, default_ability in SKILLS:
-        skill = skills.get(code, {})
+        skill = _mapping(skills.get(code))
         ability_code = skill.get("ability") or default_ability
-        mod = ability_mod(to_int(abilities.get(ability_code, {}).get("value")))
+        mod = ability_mod(to_int(_mapping(abilities.get(ability_code)).get("value")))
         multiplier = to_number(skill.get("value"))
-        bonus = mod + int(prof_bonus * multiplier) + to_int(skill.get("bonuses", {}).get("check"))
-        passive = 10 + bonus + to_int(skill.get("bonuses", {}).get("passive"))
+        bonus = mod + int(prof_bonus * multiplier) + to_int(_mapping(skill.get("bonuses")).get("check"))
+        passive = 10 + bonus + to_int(_mapping(skill.get("bonuses")).get("passive"))
         skill_rows.append({
             "label": label,
             "ability": ability_code.upper(),
@@ -878,11 +895,11 @@ def sheet_context(actor: dict[str, Any]) -> dict[str, Any]:
         })
 
     attacks = []
-    for item in actor.get("items", []):
-        if item.get("type") != "weapon" or not item.get("system", {}).get("equipped"):
+    for item in actor.get("items") or []:
+        if item.get("type") != "weapon" or not _mapping(item.get("system")).get("equipped"):
             continue
         ability_code = attack_ability_code(item)
-        ability_bonus = ability_mod(to_int(abilities.get(ability_code, {}).get("value")))
+        ability_bonus = ability_mod(to_int(_mapping(abilities.get(ability_code)).get("value")))
         attack_bonus = ability_bonus + (prof_bonus if is_weapon_proficient(actor, item) else 0)
         attacks.append({
             "name": item.get("name", "Weapon"),
@@ -894,16 +911,16 @@ def sheet_context(actor: dict[str, Any]) -> dict[str, Any]:
 
     active_spells, spell_library = aggregate_spells(actor)
     feature_groups = collect_features(actor)
-    slot_defaults = spell_slot_defaults(system.get("spells", {}))
+    slot_defaults = spell_slot_defaults(_mapping(system.get("spells")))
 
-    spell_ability_mod = ability_mod(to_int(abilities.get(spell_ability_code, {}).get("value"))) if spell_ability_code else 0
+    spell_ability_mod = ability_mod(to_int(_mapping(abilities.get(spell_ability_code)).get("value"))) if spell_ability_code else 0
     spell_dc = 8 + prof_bonus + spell_ability_mod if spell_ability_code else None
     spell_attack = prof_bonus + spell_ability_mod if spell_ability_code else None
-    dex_mod = ability_mod(to_int(abilities.get("dex", {}).get("value")))
-    init_bonus = dex_mod + to_int(system.get("attributes", {}).get("init", {}).get("bonus"))
+    dex_mod = ability_mod(to_int(_mapping(abilities.get("dex")).get("value")))
+    init_bonus = dex_mod + to_int(_mapping(_mapping(system.get("attributes")).get("init")).get("bonus"))
     race_movement = race_item.get("system", {}).get("movement", {}).get("walk") if race_item else None
     senses = race_item.get("system", {}).get("senses", {}).get("ranges", {}) if race_item else {}
-    hp = system.get("attributes", {}).get("hp", {})
+    hp = _mapping(_mapping(system.get("attributes")).get("hp"))
     armor_class = derive_armor_class(actor, dex_mod)
     shield_bonus = sum(to_int(item.get("system", {}).get("armor", {}).get("value")) for item in equipped_shields)
     spellcast_label = ABILITY_LABELS.get(spell_ability_code, spell_ability_code.upper()) if spell_ability_code else "None"
@@ -913,7 +930,7 @@ def sheet_context(actor: dict[str, Any]) -> dict[str, Any]:
     hit_dice_spent = to_int(class_item.get("system", {}).get("hd", {}).get("spent")) if class_item else 0
 
     inventory = []
-    containers = {item.get("_id"): item.get("name") for item in actor.get("items", []) if item.get("type") == "container"}
+    containers = {item.get("_id"): item.get("name") for item in actor.get("items") or [] if item.get("type") == "container"}
     for item in armor_items:
         system_data = item.get("system", {})
         quantity = to_int(system_data.get("quantity"), 1)
@@ -953,10 +970,10 @@ def sheet_context(actor: dict[str, Any]) -> dict[str, Any]:
         "spell_library": {level: sorted(names) for level, names in spell_library.items()},
         "feature_groups": feature_groups,
         "slot_defaults": slot_defaults,
-        "currency": format_currency(system.get("currency", {})),
+        "currency": format_currency(_mapping(system.get("currency"))),
         "inventory": inventory,
         "inventory_weight": total_weight(armor_items),
-        "languages": [LANGUAGE_LABELS.get(code, pretty_code(code)) for code in traits.get("languages", {}).get("value", [])],
+        "languages": [LANGUAGE_LABELS.get(code, pretty_code(code)) for code in _mapping(traits.get("languages")).get("value") or []],
         "proficiencies": proficiencies,
         "passive_perception": passive_scores.get("prc", 10),
         "passive_insight": passive_scores.get("ins", 10),
@@ -976,11 +993,11 @@ def sheet_context(actor: dict[str, Any]) -> dict[str, Any]:
         "spell_dc": spell_dc,
         "spell_attack": spell_attack,
         "is_spellcaster": is_spellcaster,
-        "inspiration": bool(system.get("attributes", {}).get("inspiration")),
+        "inspiration": bool(_mapping(system.get("attributes")).get("inspiration")),
         "hit_dice_spent": hit_dice_spent,
         "hit_dice_total": total_level,
         "hit_die_size": hit_die_size,
-        "currency_counts": coin_counts(system.get("currency", {})),
+        "currency_counts": coin_counts(_mapping(system.get("currency"))),
         "reference_counts": {
             "spells": spell_reference_count,
             "features": feature_reference_count,
@@ -4122,6 +4139,21 @@ def detect_print_browser(
     return None
 
 
+class PdfExportError(RuntimeError):
+    """Raised when headless-browser PDF export fails or times out."""
+
+
+def _log_tail(text: str | None, lines: int = 5) -> str:
+    """Last few non-blank lines of a log, joined — for error messages."""
+    relevant = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    return " | ".join(relevant[-lines:])
+
+
+# Headless browsers normally print within seconds; a hung browser must not
+# wedge a caller (the web UI serves requests on threads).
+PDF_EXPORT_TIMEOUT_SECONDS = 120
+
+
 def render_pdf(html_path: Path, pdf_path: Path, browser: str, mode: str | None = None) -> None:
     target_uri = html_path.resolve().as_uri()
     if mode:
@@ -4130,14 +4162,30 @@ def render_pdf(html_path: Path, pdf_path: Path, browser: str, mode: str | None =
         browser,
         "--headless",
         "--disable-gpu",
+        # Kept for compatibility (root/container runs need it); the sheet is
+        # self-contained, and file:// access stays locked down below.
         "--no-sandbox",
-        "--allow-file-access-from-files",
         "--virtual-time-budget=1500",
         "--no-pdf-header-footer",
         f"--print-to-pdf={pdf_path}",
         target_uri,
     ]
-    subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        result = subprocess.run(command, check=False, capture_output=True, text=True,
+                                timeout=PDF_EXPORT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        stderr = exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else exc.stderr
+        detail = _log_tail(stderr)
+        raise PdfExportError(
+            f"{Path(browser).name} did not finish printing within "
+            f"{PDF_EXPORT_TIMEOUT_SECONDS}s." + (f" {detail}" if detail else "")
+        ) from exc
+    if result.returncode != 0:
+        detail = _log_tail(result.stderr)
+        raise PdfExportError(
+            f"{Path(browser).name} exited with status {result.returncode} while printing."
+            + (f" {detail}" if detail else "")
+        )
 
 
 def parse_theme_arg(value: str) -> str:
@@ -4237,7 +4285,11 @@ def main() -> int:
             return 1
         for path in html_paths:
             pdf_path = path.with_suffix(".pdf")
-            render_pdf(path, pdf_path, browser, mode=args.mode)
+            try:
+                render_pdf(path, pdf_path, browser, mode=args.mode)
+            except PdfExportError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 1
             print(f"PDF written to {pdf_path}")
 
     return 0

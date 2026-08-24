@@ -1,0 +1,15 @@
+# Lint configuration. The project is stdlib-only and much of its bulk is
+# hand-authored HTML/CSS template strings, so the rule set stays pragmatic:
+# correctness-focused checks plus import sorting and py3.10 upgrade advice.
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = [
+    # Template literals in generate_character_sheet.py are kept as authored.
+    "E501",
+]
+
+[lint.per-file-ignores]
+# Test helpers intentionally patch module attributes at runtime.
+"tests/*" = []

@@ -16,6 +16,47 @@ this file.
 
 ## [Unreleased]
 
+### Security
+
+- The local web UI now rejects requests whose `Host` header does not name the
+  running server (defeats DNS rebinding against 127.0.0.1) and cross-site POSTs
+  carrying a foreign `Origin` header (defeats drive-by requests that could
+  replace or read the loaded character).
+- Fight Club XML containing DTD/entity declarations is rejected before parsing
+  instead of being expanded, closing an entity-expansion denial-of-service
+  vector for uploaded (and CLI-loaded) files.
+- Web UI request bodies are capped at 64 MiB; malformed or negative
+  `Content-Length` headers now get a clean 400 instead of stalling or killing
+  the request thread.
+- `--to-fightclub` now strips control characters from exported text; they are
+  legal in JSON but illegal in XML 1.0 and used to produce XML that no parser
+  would re-read.
+
+### Changed
+
+- PDF export no longer passes `--allow-file-access-from-files` to the browser
+  (the generated sheet is self-contained; file:// read access stays locked
+  down). A failing or hung browser now raises a clear error that includes the
+  browser's last stderr lines — surfaced as a soft warning in the web UI's PDF
+  download panel and a clean `error:` line in the CLI instead of a traceback.
+  Headless printing is bounded by a 120-second timeout.
+- The desktop launcher reuses the web UI's argument parser instead of
+  duplicating it; both now document their live defaults via `%(...)s`.
+- CI now runs the test suite on Python 3.10–3.13 (plus 3.10 on Windows and
+  macOS), lints with ruff (`ruff.toml`), compiles every Python module instead
+  of a hand-maintained list, and drops a leftover "no tests yet" guard.
+- Actor fields that are present but `null` (abilities, attributes, skills,
+  spells, currency, items) no longer crash derivation; they are treated like
+  missing fields. Output for valid exports is byte-identical (verified over all
+  theme x mode x paper x footer combinations).
+- The web UI's shared upload state is now lock-protected and rendered from
+  atomic snapshots, so two browser tabs can no longer mix one actor's context
+  with another's during concurrent preview/generate requests.
+- Unexpected web UI failures now return a generic message with the traceback on
+  the server console, instead of echoing raw exception text (which could contain
+  absolute paths) to the browser. Download filenames are defensively sanitized
+  for the `Content-Disposition` header.
+
 ### Fixed
 
 - Formulas glued to a reference (e.g. `@abilities.int.mod-1`, `@prof-1`) no longer

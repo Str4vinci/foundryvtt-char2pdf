@@ -406,8 +406,20 @@ def _build_feature_items(char: ET.Element) -> list[dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 # Top-level assembly
 # --------------------------------------------------------------------------- #
+_DTD_RE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+
+
 def parse_actor(xml_text: str) -> dict[str, Any]:
-    """Parse Fight Club 5e character XML into a Foundry-shaped dnd5e actor dict."""
+    """Parse Fight Club 5e character XML into a Foundry-shaped dnd5e actor dict.
+
+    DTD/entity declarations are rejected up front rather than handed to the
+    parser: real exports never carry them, and expanding crafted entities
+    ("billion laughs") can exhaust memory and CPU.
+    """
+    if _DTD_RE.search(xml_text):
+        raise FightClubParseError(
+            "This XML declares a DTD/entity section, which Fight Club exports never use."
+        )
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError as exc:
@@ -511,10 +523,16 @@ def _plain_text(html_text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+# Control characters other than tab/newline/carriage-return are illegal in XML
+# 1.0 documents. ElementTree writes them out silently, producing XML the apps
+# (and ElementTree itself) then refuse to read, so strip them at the boundary.
+_ILLEGAL_XML_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
 def _elem(parent: ET.Element, tag: str, text: Any = None) -> ET.Element:
     el = ET.SubElement(parent, tag)
     if text is not None:
-        el.text = str(text)
+        el.text = _ILLEGAL_XML_CHARS.sub("", str(text))
     return el
 
 

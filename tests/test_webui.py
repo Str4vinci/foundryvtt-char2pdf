@@ -8,7 +8,6 @@ from pathlib import Path
 import generate_character_sheet as sheet
 import webui
 
-
 MINIMAL_ACTOR = {
     "name": "Web Cleric",
     "type": "character",
@@ -94,14 +93,14 @@ class ServerTests(unittest.TestCase):
         self.thread.join(timeout=5)
         self.tmp.cleanup()
 
-    def _req(self, method: str, path: str, body=None):
+    def _req(self, method: str, path: str, body=None, req_headers=None):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
-        conn.request(method, path, body=body)
+        conn.request(method, path, body=body, headers=req_headers or {})
         resp = conn.getresponse()
         data = resp.read()
-        headers = dict(resp.getheaders())
+        resp_headers = dict(resp.getheaders())
         conn.close()
-        return resp.status, headers, data
+        return resp.status, resp_headers, data
 
     def test_index_and_themes(self) -> None:
         status, headers, body = self._req("GET", "/")
@@ -152,6 +151,75 @@ class ServerTests(unittest.TestCase):
         self._req("POST", "/actor", json.dumps(MINIMAL_ACTOR))
         status, _, _ = self._req("POST", "/generate", json.dumps({"theme": "ledger", "mode": "neon"}))
         self.assertEqual(status, 400)
+
+    def test_foreign_host_header_is_rejected(self) -> None:
+        # DNS rebinding points a public hostname at 127.0.0.1; the Host check
+        # must refuse anything but this server's own address.
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        try:
+            conn.request("GET", "/", headers={"Host": "evil.example"})
+            resp = conn.getresponse()
+            resp.read()
+            self.assertEqual(resp.status, 403)
+        finally:
+            conn.close()
+
+    def test_cross_origin_post_is_rejected(self) -> None:
+        # A hostile page can POST to 127.0.0.1 without a CORS preflight; the
+        # Origin header gives it away.
+        status, _, _ = self._req("POST", "/actor", json.dumps(MINIMAL_ACTOR),
+                                 req_headers={"Origin": "https://evil.example"})
+        self.assertEqual(status, 403)
+
+    def test_same_origin_post_is_accepted(self) -> None:
+        origin = f"http://127.0.0.1:{self.port}"
+        status, _, _ = self._req("POST", "/actor", json.dumps(MINIMAL_ACTOR),
+                                 req_headers={"Origin": origin})
+        self.assertEqual(status, 200)
+
+    def test_oversized_body_is_rejected_with_413(self) -> None:
+        original = webui.MAX_BODY_BYTES
+        webui.MAX_BODY_BYTES = 16
+        try:
+            status, _, _ = self._req("POST", "/actor", json.dumps(MINIMAL_ACTOR))
+        finally:
+            webui.MAX_BODY_BYTES = original
+        self.assertEqual(status, 413)
+
+    def test_malformed_content_length_returns_400(self) -> None:
+        status, _, _ = self._req("POST", "/actor", req_headers={"Content-Length": "abc"})
+        self.assertEqual(status, 400)
+
+    def test_negative_content_length_returns_400_instead_of_hanging(self) -> None:
+        # Previously rfile.read(-5) blocked until EOF; it must be rejected.
+        status, _, _ = self._req("POST", "/actor", req_headers={"Content-Length": "-5"})
+        self.assertEqual(status, 400)
+
+    def test_internal_error_is_generic_and_does_not_leak_internals(self) -> None:
+        self._req("POST", "/actor", json.dumps(MINIMAL_ACTOR))
+        original = webui.gen._render_one_theme
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("secret /home/leo/absolute/path")
+
+        webui.gen._render_one_theme = boom
+        try:
+            status, _, body = self._req("POST", "/generate", json.dumps({"theme": "ledger"}))
+        finally:
+            webui.gen._render_one_theme = original
+        self.assertEqual(status, 500)
+        self.assertNotIn(b"secret", body)
+        self.assertNotIn(b"/home/leo", body)
+        self.assertIn(b"Something went wrong", body)
+
+
+class AttachmentNameTests(unittest.TestCase):
+    def test_header_breaking_characters_are_neutralized(self) -> None:
+        for nasty in ('a"b\r\nc', "../../etc/passwd", "sheet?.html", ""):
+            with self.subTest(name=nasty):
+                cleaned = webui._attachment_name(nasty)
+                self.assertTrue(all(ch.isalnum() or ch in ".-_" for ch in cleaned))
+                self.assertNotEqual(cleaned, "")
 
 
 if __name__ == "__main__":

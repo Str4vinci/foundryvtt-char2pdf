@@ -7,10 +7,9 @@ on:
       - main
 
 jobs:
-  test:
-    name: Python checks
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -20,13 +19,38 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Compile Python files
-        run: python -m py_compile generate_character_sheet.py webui.py char2pdf_desktop.py
+      - name: Install ruff
+        run: python -m pip install ruff
+
+      - name: Run ruff
+        run: ruff check .
+
+  test:
+    name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          # Minimum supported version on the other platforms.
+          - os: windows-latest
+            python-version: "3.10"
+          - os: macos-latest
+            python-version: "3.10"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Compile all Python files
+        run: python -m compileall generate_character_sheet.py webui.py char2pdf_desktop.py fightclub.py systems.py tests
 
       - name: Run unit tests
-        run: |
-          if find tests -name 'test*.py' -print -quit 2>/dev/null | grep -q .; then
-            python -m unittest discover -s tests
-          else
-            echo "No test files yet; skipping unit tests."
-          fi
+        run: python -m unittest discover -s tests -v
