@@ -8,7 +8,6 @@ from pathlib import Path
 import generate_character_sheet as sheet
 import webui
 
-
 MINIMAL_ACTOR = {
     "name": "Web Cleric",
     "type": "character",

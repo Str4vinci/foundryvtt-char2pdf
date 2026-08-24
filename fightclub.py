@@ -523,10 +523,16 @@ def _plain_text(html_text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+# Control characters other than tab/newline/carriage-return are illegal in XML
+# 1.0 documents. ElementTree writes them out silently, producing XML the apps
+# (and ElementTree itself) then refuse to read, so strip them at the boundary.
+_ILLEGAL_XML_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
 def _elem(parent: ET.Element, tag: str, text: Any = None) -> ET.Element:
     el = ET.SubElement(parent, tag)
     if text is not None:
-        el.text = str(text)
+        el.text = _ILLEGAL_XML_CHARS.sub("", str(text))
     return el
 
 

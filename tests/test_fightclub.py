@@ -1,8 +1,9 @@
+import copy
 import unittest
 from pathlib import Path
 
 import fightclub
-import generate_character_sheet as sheet
+import generate_character_sheet  # noqa: F401 -- importing registers Dnd5eAdapter
 import systems
 
 FIXTURE = Path(__file__).parent / "fixtures" / "fightclub_sample.xml"
@@ -36,6 +37,26 @@ class FightClubImportTests(unittest.TestCase):
         sneaky = '<!ENTITY lol "lol"><pc version="5"><character/></pc>'
         with self.assertRaises(fightclub.FightClubParseError):
             fightclub.parse_actor(sneaky)
+
+    def test_truncated_xml_raises_parse_error(self) -> None:
+        truncated = '<?xml version="1.0"?><pc version="5"><character><name>Trun'
+        with self.assertRaises(fightclub.FightClubParseError):
+            fightclub.parse_actor(truncated)
+
+    def test_garbage_numeric_fields_do_not_crash(self) -> None:
+        xml = self.xml.replace("<hpMax>21</hpMax>", "<hpMax>lots</hpMax>")
+        actor = fightclub.parse_actor(xml)
+        # Unparseable numbers coerce to 0 instead of raising.
+        self.assertEqual(actor["system"]["attributes"]["hp"]["max"], 0)
+
+    def test_export_strips_illegal_control_characters(self) -> None:
+        # Control chars are legal JSON but illegal in XML 1.0; exporting them
+        # used to produce XML that no parser (including ElementTree) re-reads.
+        actor = copy.deepcopy(self.actor)
+        actor["name"] = "Bad\x01Name"
+        xml = fightclub.to_xml(actor)
+        reparsed = fightclub.parse_actor(xml)
+        self.assertEqual(reparsed["name"], "BadName")
 
     def test_identity(self) -> None:
         self.assertEqual(self.actor["name"], "Test Cleric")

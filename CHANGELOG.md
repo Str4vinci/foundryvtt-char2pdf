@@ -16,6 +16,16 @@ this file.
 
 ## [Unreleased]
 
+### Changed
+
+- CI now runs the test suite on Python 3.10–3.13 (plus 3.10 on Windows and
+  macOS), lints with ruff (`ruff.toml`), compiles every Python module instead
+  of a hand-maintained list, and drops a leftover "no tests yet" guard.
+- Actor fields that are present but `null` (abilities, attributes, skills,
+  spells, currency, items) no longer crash derivation; they are treated like
+  missing fields. Output for valid exports is byte-identical (verified over all
+  theme x mode x paper x footer combinations).
+
 ### Security
 
 - The local web UI now rejects requests whose `Host` header does not name the
@@ -28,6 +38,9 @@ this file.
 - Web UI request bodies are capped at 64 MiB; malformed or negative
   `Content-Length` headers now get a clean 400 instead of stalling or killing
   the request thread.
+- `--to-fightclub` now strips control characters from exported text; they are
+  legal in JSON but illegal in XML 1.0 and used to produce XML that no parser
+  would re-read.
 
 ### Changed
 

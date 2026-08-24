@@ -5,7 +5,6 @@ from pathlib import Path
 
 import generate_character_sheet as sheet
 
-
 MINIMAL_ACTOR = {
     "name": "CI Cleric",
     "type": "character",
@@ -130,6 +129,42 @@ class GenerationSmokeTests(unittest.TestCase):
             return path == wanted
 
         self.assertEqual(sheet.detect_print_browser(which=lambda _: None, exists=fake_exists), str(wanted))
+
+
+class NullFieldRobustnessTests(unittest.TestCase):
+    """A field present but null must be tolerated like a missing one."""
+
+    NULL_FIELD_ACTOR = {
+        "name": "Null Carrier",
+        "type": "character",
+        "_stats": {"systemId": "dnd5e"},
+        "system": {
+            "abilities": {"str": None, "dex": {"value": 14}},
+            "attributes": None,
+            "details": None,
+            "skills": None,
+            "tools": None,
+            "traits": None,
+            "spells": {"spell1": None},
+            "currency": None,
+        },
+        "items": None,
+    }
+
+    def test_sheet_context_survives_null_fields(self) -> None:
+        context = sheet.sheet_context(self.NULL_FIELD_ACTOR)
+        self.assertEqual(context["level"], 0)
+        # A null ability value coerces to 0 exactly like a missing one.
+        self.assertEqual([row["score"] for row in context["ability_rows"]][0], 0)
+
+    def test_null_field_actor_renders_with_ledger_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            actor_path = tmp_path / "nulls.json"
+            actor_path.write_text(json.dumps(self.NULL_FIELD_ACTOR))
+            paths = sheet.write_output(actor_path, tmp_path)
+            self.assertEqual(paths[0].name, "null-carrier-character-sheet-ledger.html")
+            self.assertIn("<!doctype html>", paths[0].read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
