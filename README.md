@@ -46,9 +46,21 @@ A few of the built-in themes and color modes:
 
 By default the generator picks a theme based on the actor's primary class. You can override with `--theme NAME` or pass a custom `#RRGGBB` accent.
 
+Each theme recolors the whole sheet (paper, panels, ink, and accents), not just the highlight color, and has its own light and dark variant. Each also has its own typefaces — Space Grotesk for Dracula, Zilla Slab for Gruvbox, Cinzel and Cormorant for Grimoire, and so on — which are embedded in the sheet, so it looks the same on every computer and in the PDF (see [Fonts](#fonts)). Every page header also carries a small emblem for the character's class (a sun for clerics, a flame for sorcerers, a d20 for classes without one), drawn in the theme's accent.
+
 - **Layouts** (typography + ornaments): `ledger`, `gazette`, `grimoire`.
-- **Curated palettes** (ledger layout + bespoke decoration): `dracula`, `catppuccin` / `catppuccin-latte`, `nord`, `hearth`, `solarized`, `everforest` / `everforest-light`, `gruvbox` / `gruvbox-light`, `ayu-light` / `ayu-mirage`, `material`, `tokyo-night`, `one-dark`, `rose-pine` / `rose-pine-dawn`, `kanagawa`.
-- **Class accents** (one per D&D class): `artificer`, `barbarian`, `bard`, `cleric`, `druid`, `fighter`, `monk`, `paladin`, `ranger`, `rogue`, `sorcerer`, `warlock`, `wizard`.
+- **Curated palettes** (ledger layout + the scheme's own colors, fonts, and decoration): `dracula`, `catppuccin`, `nord`, `hearth`, `solarized`, `everforest`, `gruvbox`, `tokyo-night`, `one-dark`, `rose-pine`, `kanagawa`, `ayu`, `material`. Light mode uses each scheme's official light variant (Catppuccin Latte, Rosé Pine Dawn, Ayu Light, …) and dark mode its dark one (Mocha, Main, Mirage, …).
+- **Class themes** (one per D&D class, with surfaces tinted toward the class color): `artificer`, `barbarian`, `bard`, `cleric`, `druid`, `fighter`, `monk`, `paladin`, `ranger`, `rogue`, `sorcerer`, `warlock`, `wizard`.
+
+The older variant names `catppuccin-latte`, `rose-pine-dawn`, `everforest-light`, `gruvbox-light`, `ayu-light`, and `ayu-mirage` still work: they select the merged theme and start it in the matching color mode.
+
+Every theme is contrast-checked when it renders. Text and accents are darkened or lightened just enough to reach WCAG AA (4.5:1 for text, 3:1 for decorative accents) on every surface, and `tests/test_themes.py` enforces this for every theme in both modes. Light mode prints on plain white paper; the tinted surfaces are for the screen only.
+
+### Fonts
+
+The typefaces are bundled in `fonts/` as Latin-subset WOFF2 files, all under the SIL Open Font License or Apache 2.0 (license texts in `fonts/licenses/`). Each generated sheet inlines only the fonts its theme uses, which adds about 180–270 KB to the HTML. No font is downloaded at render or view time, so sheets work offline and character data never triggers a network request. Characters outside the Latin subset (for example Cyrillic names) fall back to a system font.
+
+To add a typeface or refresh the set, edit `FAMILIES` in `tools/fetch_fonts.py` and run `python tools/fetch_fonts.py` (this is the only part of the project that needs network access).
 
 ## Color modes
 
@@ -63,7 +75,7 @@ Every generated HTML sheet also includes an in-browser theme toggle that cycles 
 ## Requirements
 
 - Python `3.10+`. Older Python versions are not supported because the generator uses modern type-hint syntax.
-- No third-party Python packages; the generator uses only the Python standard library
+- No third-party Python packages; the generator uses only the Python standard library. The fonts it embeds ship in the repository (`fonts/`).
 - A Chromium-compatible browser for PDF export: Chromium, Google Chrome, Microsoft Edge, Brave, Vivaldi, Helium, or Arc
 
 HTML generation works with vanilla Python alone. PDF generation additionally requires a local Chromium-compatible browser. The generator looks for common Linux commands plus standard macOS and Windows install paths for the browsers listed above, checking both the system-wide `/Applications` and a per-user `~/Applications` on macOS. If autodetection does not find your browser, pass it explicitly with `--print-browser /path/to/browser` or the legacy `--chromium /path/to/browser`. CI checks the minimum supported Python version, currently Python 3.10.
@@ -91,6 +103,8 @@ Run the `Windows EXE` GitHub Actions workflow, download and unzip the `char2pdf-
 python -m pip install -r requirements-build.txt
 python -m PyInstaller --noconfirm --clean char2pdf.spec
 ```
+
+`char2pdf.spec` bundles the `fonts/` directory into the executable.
 
 ## Usage
 
@@ -163,7 +177,7 @@ Planned or wanted directions for the project. Contributions in any of these area
 
 - **Polished desktop app packaging.** A basic Windows PyInstaller build exists; remaining work includes validating the artifact on Windows, adding icon/version metadata, deciding whether to ship macOS/Linux builds, and considering signing or installer packaging. Build-time tooling only — the generator runtime stays standard-library-only.
 - **Cross-platform PDF parity.** Browser detection now covers Chrome, Edge, Chromium, Brave, Vivaldi, Helium, and Arc across Linux/macOS/Windows (including per-user `~/Applications` on macOS), and PDF export is validated on macOS. Remaining work is validating the Windows path on a real machine.
-- **More curated palettes.** A daytime-leaning batch shipped (Gruvbox Light, Ayu Light/Mirage, Material, Everforest Light) on top of the existing set (Solarized, Gruvbox, Tokyo Night, Kanagawa, …). Further popular schemes and more dedicated light themes are still welcome.
+- **More curated palettes.** Thirteen schemes ship, each with its official light and dark variant (Solarized, Gruvbox, Tokyo Night, Kanagawa, Ayu, …). Further popular schemes are still welcome.
 - **More tabletop RPG systems.** A system-adapter boundary now separates system-specific schema/layout code from the shared framework (themes, color modes, paper profiles, PDF export, web UI). `dnd5e` is the first and currently only adapter. Adding another system (Pathfinder 2e, Call of Cthulhu, Shadowdark, etc.) means writing a new adapter — see [Adding a new game system](#adding-a-new-game-system).
 - **More import/export formats.** Alongside Foundry JSON, the generator reads and writes Lion's Den Fight Club 5e / Game Master 5 XML (see [Fight Club 5e XML](#fight-club-5e-xml)). Both directions are intentionally lossy where the format omits data (weapon damage, some proficiencies, subclass, equipped state); tightening those gaps and adding further formats (D&D Beyond, other apps) is welcome.
 - **Per-system print tuning.** A4 and US Letter profiles already ship; future work should tune page density and content priorities per game system.
@@ -178,7 +192,8 @@ Issues and pull requests are welcome.
 - Add a `CHANGELOG.md` entry under `## [Unreleased]` for anything users would notice.
 - When fixing a rendering bug, include a sanitized actor JSON (or a minimal repro) that triggers it.
 - Do not commit private actor exports, generated `output/`, or third-party copyrighted artwork.
-- New themes should add an entry to `THEMES` in `generate_character_sheet.py` and follow the existing `light_accent` / `dark_accent` pattern.
+- New themes should add an entry to `THEMES` in `generate_character_sheet.py` with a full `light` and `dark` palette (via `_light(...)` / `_dark(...)`), plus a `PALETTE_DECORATIONS` entry for fonts and decoration. `tests/test_themes.py` checks contrast automatically. If the theme uses a new typeface, add it to `tools/fetch_fonts.py` (open licenses only) and commit the fetched files.
+- New class emblems go in `emblems.py`: a 24×24 line drawing that uses `currentColor`, so it follows the theme accent and mono mode.
 - New TTRPG-system support should live behind the system-adapter boundary so the existing `dnd5e` path is not regressed. See [Adding a new game system](#adding-a-new-game-system).
 
 ## Adding a new game system
@@ -192,8 +207,12 @@ A small **system-adapter boundary** in `systems.py` detects which system an acto
 | `matches(actor) -> bool` | Recognize the actor's schema shape. Called only when the export carries no usable `_stats.systemId` hint. |
 | `build_context(actor) -> dict` | Parse the raw actor export into a render-ready context dict. |
 | `default_theme(actor) -> str \| None` | The theme to use when the caller did not request one. |
-| `render(context, sheet_id, *, style, initial_theme, theme_palette, palette_decoration, include_footer, paper) -> str` | Render one themed sheet (a full HTML document). |
+| `render(context, sheet_id, *, style, initial_theme, theme_palette, palette_decoration, include_footer, paper) -> str` | Render one themed sheet (a full HTML document). `theme_palette` is the contrast-checked `{"light": {...}, "dark": {...}}` palette from `build_theme_palette`. |
 
-Everything else is **shared framework that every adapter inherits for free**: the `THEMES` registry and palettes, the color modes, the paper profiles, PDF export, browser detection, the web UI, and the `localStorage` trackers.
+Everything else is **shared framework that every adapter inherits for free**: the `THEMES` registry and palettes, the contrast guardrails, the embedded fonts, the color modes, the paper profiles, PDF export, browser detection, the web UI, and the `localStorage` trackers.
 
 To add a system: implement the protocol (the `dnd5e` `Dnd5eAdapter` in `generate_character_sheet.py` is the reference), then `systems.register(YourAdapter())` at import time. Detection is then automatic via `_stats.systemId` or your `matches()`; unsupported exports raise a clear `UnsupportedSystemError` naming the detected system.
+
+## License
+
+The code is released under the [MIT License](LICENSE). The bundled fonts in `fonts/` keep their own licenses (SIL Open Font License 1.1, or Apache 2.0 for Roboto Slab); each license text is in `fonts/licenses/`.

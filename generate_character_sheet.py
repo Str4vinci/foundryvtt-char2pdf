@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 import ast
+import base64
+import colorsys
 import html
 import json
 import math
@@ -16,9 +18,11 @@ import shutil
 import subprocess
 import sys
 from collections import defaultdict
+from functools import cache, lru_cache
 from pathlib import Path
 from typing import Any
 
+import emblems
 import fightclub
 import systems
 
@@ -575,6 +579,38 @@ def mix_hex(color: str, mix_with: str, ratio: float) -> str:
         round(cg * (1 - ratio) + mg * ratio),
         round(cb * (1 - ratio) + mb * ratio),
     )
+
+
+def hex_to_rgba(color: str, alpha: float) -> str:
+    r, g, b = _hex_to_rgb(color)
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
+
+_RGBA_RE = re.compile(r"rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)")
+
+
+def flatten_color(color: str, under: str) -> str:
+    """Opaque hex for a #hex or rgba() color painted over the opaque ``under`` color."""
+    match = _RGBA_RE.fullmatch(color.strip())
+    if not match:
+        return color
+    r, g, b = (round(float(v)) for v in match.groups()[:3])
+    alpha = float(match.group(4)) if match.group(4) is not None else 1.0
+    return mix_hex(_rgb_to_hex(r, g, b), under, 1 - alpha)
+
+
+def relative_luminance(color: str) -> float:
+    def channel(value: int) -> float:
+        c = value / 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = _hex_to_rgb(color)
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+
+
+def contrast_ratio(a: str, b: str) -> float:
+    """WCAG 2 contrast ratio between two opaque #hex colors."""
+    hi, lo = sorted((relative_luminance(a), relative_luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
 
 
 def is_weapon_proficient(actor: dict[str, Any], weapon: dict[str, Any]) -> bool:
@@ -1185,628 +1221,519 @@ CLASS_THEME_COLORS = {
 
 HEX_COLOR_RE = re.compile(r"^#?[0-9a-fA-F]{6}$")
 
+# Minimum WCAG contrast ratios enforced on every theme, in every color mode.
+# Accent text (titles, ability modifiers, labels) must meet the text threshold;
+# the secondary accent only draws corner brackets and focus rings, so it needs
+# the non-text (graphics) threshold.
+TEXT_CONTRAST = 4.5
+GRAPHIC_CONTRAST = 3.0
 
-def _class_theme_entry(accent: str, base: str = "ledger") -> dict:
-    dark = mix_hex(accent, "#f5ecd7", 0.45)
+_LIGHT_SHADOW = "0 18px 42px rgba(20, 22, 26, 0.08)"
+_DARK_SHADOW = "0 24px 52px rgba(0, 0, 0, 0.55)"
+
+
+def _surfaces(
+    paper: str,
+    panel: str,
+    panel_soft: str,
+    ink: str,
+    ink_soft: str,
+    accent: str,
+    accent_strong: str,
+    *,
+    dark: bool,
+) -> dict[str, str]:
+    """One color mode of a theme: page surfaces, text inks, and the two accents."""
     return {
-        "base": base,
-        "decoration": None,
-        "light_accent":        accent,
-        "light_accent_strong": accent,
-        "dark_accent":         dark,
-        "dark_accent_strong":  dark,
+        "paper": paper,
+        "panel": panel,
+        "panel_soft": panel_soft,
+        "ink": ink,
+        "ink_soft": ink_soft,
+        "rule": hex_to_rgba(ink, 0.72 if dark else 0.84),
+        "rule_soft": hex_to_rgba(ink, 0.16 if dark else 0.14),
+        "shadow": _DARK_SHADOW if dark else _LIGHT_SHADOW,
+        "accent": accent,
+        "accent_strong": accent_strong,
     }
 
 
+def _light(*colors: str) -> dict[str, str]:
+    return _surfaces(*colors, dark=False)
+
+
+def _dark(*colors: str) -> dict[str, str]:
+    return _surfaces(*colors, dark=True)
+
+
+def _class_theme_entry(accent: str, base: str = "ledger") -> dict:
+    """Class (or custom #hex) theme: neutral surfaces tinted toward one accent."""
+    return {
+        "base": base,
+        "decoration": "class",
+        "light": _light(
+            mix_hex(accent, "#f2f0eb", 0.89),  # paper
+            mix_hex(accent, "#ffffff", 0.965),  # panel
+            mix_hex(accent, "#f6f4f0", 0.93),  # panel_soft
+            mix_hex(accent, "#15171b", 0.88),  # ink
+            mix_hex(accent, "#4a4f57", 0.72),  # ink_soft
+            accent,
+            accent,
+        ),
+        "dark": _dark(
+            mix_hex(accent, "#0c0d10", 0.88),
+            mix_hex(accent, "#15171c", 0.90),
+            mix_hex(accent, "#1d2027", 0.88),
+            mix_hex(accent, "#efebe3", 0.90),
+            mix_hex(accent, "#a9a59c", 0.80),
+            accent,
+            accent,
+        ),
+    }
+
+
+# Layout themes keep the exact surfaces their base stylesheet was designed with.
+_LAYOUT_DARK = {
+    "paper": "#0f1114",
+    "panel": "rgba(24, 27, 34, 0.94)",
+    "panel_soft": "rgba(34, 38, 48, 0.62)",
+    "ink": "#ecdcbd",
+    "ink_soft": "#a8a091",
+    "rule": "rgba(236, 220, 189, 0.72)",
+    "rule_soft": "rgba(236, 220, 189, 0.16)",
+    "shadow": "0 24px 52px rgba(0, 0, 0, 0.55)",
+}
+
 THEMES: dict[str, dict] = {
-    # Layout-flavored themes — typography + ornaments come from base layout, no extra decoration
-    "ledger":   {"base": "ledger",   "decoration": None,
-                 "light_accent": "#7a1518", "light_accent_strong": "#7a1518",
-                 "dark_accent":  "#f39c7e", "dark_accent_strong":  "#f39c7e"},
-    "gazette":  {"base": "gazette",  "decoration": None,
-                 "light_accent": "#18150f", "light_accent_strong": "#8a6c2d",
-                 "dark_accent":  "#e7d3a3", "dark_accent_strong":  "#c7a558"},
-    "grimoire": {"base": "grimoire", "decoration": None,
-                 "light_accent": "#6d1a1a", "light_accent_strong": "#9e7a2b",
-                 "dark_accent":  "#e9c26a", "dark_accent_strong":  "#c79a3a"},
-    # Curated palette themes — ledger baseline + bespoke typography overlay + body decoration
-    "dracula":    {"base": "ledger", "decoration": "dracula",
-                   "light_accent": "#bd4f99", "light_accent_strong": "#7d4cc6",
-                   "dark_accent":  "#ff79c6", "dark_accent_strong":  "#8be9fd"},
-    "catppuccin": {"base": "ledger", "decoration": "catppuccin",
-                   "light_accent": "#8839ef", "light_accent_strong": "#1e66f5",
-                   "dark_accent":  "#cba6f7", "dark_accent_strong":  "#89b4fa"},
-    "nord":       {"base": "ledger", "decoration": "nord",
-                   "light_accent": "#5e81ac", "light_accent_strong": "#88c0d0",
-                   "dark_accent":  "#88c0d0", "dark_accent_strong":  "#81a1c1"},
-    "hearth":     {"base": "ledger", "decoration": "hearth",
-                   "light_accent": "#cc785c", "light_accent_strong": "#915641",
-                   "dark_accent":  "#e8a487", "dark_accent_strong":  "#d4836a"},
-    # Popular editor/designer palettes — ledger baseline + bespoke typography + body decoration
-    "solarized":        {"base": "ledger", "decoration": "solarized",
-                         "light_accent": "#268bd2", "light_accent_strong": "#2aa198",
-                         "dark_accent":  "#2aa198", "dark_accent_strong":  "#b58900"},
-    "everforest":       {"base": "ledger", "decoration": "everforest",
-                         "light_accent": "#8da101", "light_accent_strong": "#f57d26",
-                         "dark_accent":  "#a7c080", "dark_accent_strong":  "#83c092"},
-    "gruvbox":          {"base": "ledger", "decoration": "gruvbox",
-                         "light_accent": "#af3a03", "light_accent_strong": "#b57614",
-                         "dark_accent":  "#fabd2f", "dark_accent_strong":  "#fe8019"},
-    "tokyo-night":      {"base": "ledger", "decoration": "tokyo-night",
-                         "light_accent": "#2e7de9", "light_accent_strong": "#9854f1",
-                         "dark_accent":  "#7aa2f7", "dark_accent_strong":  "#bb9af7"},
-    "one-dark":         {"base": "ledger", "decoration": "one-dark",
-                         "light_accent": "#4078f2", "light_accent_strong": "#a626a4",
-                         "dark_accent":  "#61afef", "dark_accent_strong":  "#c678dd"},
-    "catppuccin-latte": {"base": "ledger", "decoration": "catppuccin-latte",
-                         "light_accent": "#8839ef", "light_accent_strong": "#1e66f5",
-                         "dark_accent":  "#7287fd", "dark_accent_strong":  "#209fb5"},
-    "rose-pine":        {"base": "ledger", "decoration": "rose-pine",
-                         "light_accent": "#31748f", "light_accent_strong": "#b4637a",
-                         "dark_accent":  "#c4a7e7", "dark_accent_strong":  "#9ccfd8"},
-    "rose-pine-dawn":   {"base": "ledger", "decoration": "rose-pine-dawn",
-                         "light_accent": "#286983", "light_accent_strong": "#b4637a",
-                         "dark_accent":  "#907aa9", "dark_accent_strong":  "#d7827e"},
-    "kanagawa":         {"base": "ledger", "decoration": "kanagawa",
-                         "light_accent": "#4d699b", "light_accent_strong": "#c84053",
-                         "dark_accent":  "#7e9cd8", "dark_accent_strong":  "#98bb6c"},
-    # Daytime-leaning batch — light-first schemes plus their dark counterparts
-    "gruvbox-light":    {"base": "ledger", "decoration": "gruvbox-light",
-                         "light_accent": "#9d0006", "light_accent_strong": "#b57614",
-                         "dark_accent":  "#fb4934", "dark_accent_strong":  "#fabd2f"},
-    "ayu-light":        {"base": "ledger", "decoration": "ayu-light",
-                         "light_accent": "#fa8d3e", "light_accent_strong": "#399ee6",
-                         "dark_accent":  "#ffcc66", "dark_accent_strong":  "#59c2ff"},
-    "ayu-mirage":       {"base": "ledger", "decoration": "ayu-mirage",
-                         "light_accent": "#399ee6", "light_accent_strong": "#f07171",
-                         "dark_accent":  "#5ccfe6", "dark_accent_strong":  "#ffcc66"},
-    "material":         {"base": "ledger", "decoration": "material",
-                         "light_accent": "#6182b8", "light_accent_strong": "#39adb5",
-                         "dark_accent":  "#82aaff", "dark_accent_strong":  "#89ddff"},
-    "everforest-light": {"base": "ledger", "decoration": "everforest-light",
-                         "light_accent": "#35a77c", "light_accent_strong": "#3a94c5",
-                         "dark_accent":  "#83c092", "dark_accent_strong":  "#7fbbb3"},
-    # Class themes — ledger baseline + class accent
+    # Layout themes — typography + ornaments come from the base layout
+    "ledger": {
+        "base": "ledger", "decoration": None,
+        "light": {
+            "paper": "#ffffff",
+            "panel": "rgba(255, 255, 255, 0.94)",
+            "panel_soft": "rgba(244, 241, 236, 0.78)",
+            "ink": "#14161a",
+            "ink_soft": "#4a4f57",
+            "rule": "rgba(26, 28, 34, 0.84)",
+            "rule_soft": "rgba(20, 22, 26, 0.14)",
+            "shadow": "0 18px 42px rgba(20, 22, 26, 0.08)",
+            "accent": "#7a1518",
+            "accent_strong": "#7a1518",
+        },
+        "dark": {**_LAYOUT_DARK, "accent": "#f39c7e", "accent_strong": "#f39c7e"},
+    },
+    "gazette": {
+        "base": "gazette", "decoration": None,
+        "light": {
+            "paper": "#f6f1e4",
+            "panel": "rgba(255, 250, 236, 0.84)",
+            "panel_soft": "rgba(255, 250, 236, 0.64)",
+            "ink": "#18150f",
+            "ink_soft": "#5a5447",
+            "rule": "rgba(24, 21, 15, 0.72)",
+            "rule_soft": "rgba(24, 21, 15, 0.18)",
+            "shadow": "0 18px 42px rgba(38, 28, 14, 0.08)",
+            "accent": "#18150f",
+            "accent_strong": "#8a6c2d",
+        },
+        "dark": {
+            "paper": "#15120f",
+            "panel": "rgba(30, 26, 21, 0.94)",
+            "panel_soft": "rgba(55, 47, 39, 0.64)",
+            "ink": "#f3e8cf",
+            "ink_soft": "#b8ab95",
+            "rule": "rgba(243, 232, 207, 0.72)",
+            "rule_soft": "rgba(243, 232, 207, 0.18)",
+            "shadow": "0 24px 52px rgba(0, 0, 0, 0.58)",
+            "accent": "#e7d3a3",
+            "accent_strong": "#c7a558",
+        },
+    },
+    "grimoire": {
+        "base": "grimoire", "decoration": None,
+        "light": {
+            "paper": "#f5ead2",
+            "panel": "rgba(255, 250, 236, 0.76)",
+            "panel_soft": "rgba(233, 216, 174, 0.36)",
+            "ink": "#2a1d0f",
+            "ink_soft": "#6e5536",
+            "rule": "rgba(42, 29, 15, 0.72)",
+            "rule_soft": "rgba(42, 29, 15, 0.18)",
+            "shadow": "0 20px 48px rgba(42, 29, 15, 0.14)",
+            "accent": "#6d1a1a",
+            "accent_strong": "#9e7a2b",
+        },
+        "dark": {
+            "paper": "#121117",
+            "panel": "rgba(24, 22, 19, 0.95)",
+            "panel_soft": "rgba(46, 39, 31, 0.66)",
+            "ink": "#f0e0bb",
+            "ink_soft": "#aa9777",
+            "rule": "rgba(240, 224, 187, 0.72)",
+            "rule_soft": "rgba(240, 224, 187, 0.16)",
+            "shadow": "0 26px 58px rgba(0, 0, 0, 0.58)",
+            "accent": "#e9c26a",
+            "accent_strong": "#c79a3a",
+        },
+    },
+    # Curated palettes — each scheme's own light and dark variants.
+    # Argument order: paper, panel, panel_soft, ink, ink_soft, accent, accent_strong.
+    "dracula": {
+        "base": "ledger", "decoration": "dracula",
+        # Alucard (the official light variant) / Dracula
+        "light": _light("#f1ecd9", "#fffbeb", "#f6f1de", "#1f1f1f", "#5f5a45", "#a3144d", "#644ac9"),
+        "dark":  _dark("#191a21", "#282a36", "#303241", "#f8f8f2", "#b6bcd8", "#ff79c6", "#bd93f9"),
+    },
+    "catppuccin": {
+        "base": "ledger", "decoration": "catppuccin",
+        # Latte / Mocha
+        "light": _light("#dce0e8", "#eff1f5", "#e6e9ef", "#4c4f69", "#5c5f77", "#8839ef", "#ea76cb"),
+        "dark":  _dark("#11111b", "#1e1e2e", "#262637", "#cdd6f4", "#a6adc8", "#cba6f7", "#f5c2e7"),
+    },
+    "nord": {
+        "base": "ledger", "decoration": "nord",
+        # Snow Storm / Polar Night, Frost accents
+        "light": _light("#d8dee9", "#eceff4", "#e5e9f0", "#2e3440", "#4c566a", "#5e81ac", "#81a1c1"),
+        "dark":  _dark("#242933", "#2e3440", "#3b4252", "#eceff4", "#c0c8d6", "#88c0d0", "#81a1c1"),
+    },
+    "hearth": {
+        "base": "ledger", "decoration": "hearth",
+        "light": _light("#efe6da", "#fcf8f2", "#f5eee4", "#2b211c", "#6b5a4e", "#cc785c", "#915641"),
+        "dark":  _dark("#17120f", "#221c18", "#2c2420", "#f1e6d8", "#bba893", "#e8a487", "#d4836a"),
+    },
+    "solarized": {
+        "base": "ledger", "decoration": "solarized",
+        "light": _light("#eee8d5", "#fdf6e3", "#f5efdc", "#073642", "#586e75", "#268bd2", "#2aa198"),
+        "dark":  _dark("#00212b", "#002b36", "#073642", "#eee8d5", "#93a1a1", "#268bd2", "#2aa198"),
+    },
+    "everforest": {
+        "base": "ledger", "decoration": "everforest",
+        "light": _light("#efebd4", "#fdf6e3", "#f4f0d9", "#4a555b", "#5c6a72", "#8da101", "#35a77c"),
+        "dark":  _dark("#1e2326", "#2d353b", "#343f44", "#d3c6aa", "#9da9a0", "#a7c080", "#83c092"),
+    },
+    "gruvbox": {
+        "base": "ledger", "decoration": "gruvbox",
+        "light": _light("#f2e5bc", "#f9f5d7", "#f5edcb", "#3c3836", "#665c54", "#af3a03", "#b57614"),
+        "dark":  _dark("#1d2021", "#282828", "#32302f", "#ebdbb2", "#bdae93", "#fabd2f", "#fe8019"),
+    },
+    "tokyo-night": {
+        "base": "ledger", "decoration": "tokyo-night",
+        # Tokyo Night Day / Night
+        "light": _light("#d0d5e3", "#e9eaee", "#e1e2e7", "#343b58", "#4f5672", "#2e7de9", "#9854f1"),
+        "dark":  _dark("#16161e", "#1a1b26", "#222436", "#c0caf5", "#a9b1d6", "#7aa2f7", "#bb9af7"),
+    },
+    "one-dark": {
+        "base": "ledger", "decoration": "one-dark",
+        # One Light / One Dark
+        "light": _light("#e5e5e6", "#fafafa", "#f0f0f1", "#383a42", "#5c5f68", "#4078f2", "#a626a4"),
+        "dark":  _dark("#1e2227", "#282c34", "#2f343e", "#d7dae0", "#9da5b4", "#61afef", "#c678dd"),
+    },
+    "rose-pine": {
+        "base": "ledger", "decoration": "rose-pine",
+        # Dawn / Main
+        "light": _light("#f2e9e1", "#fffaf3", "#faf4ed", "#575279", "#6e6a86", "#907aa9", "#d7827e"),
+        "dark":  _dark("#191724", "#1f1d2e", "#26233a", "#e0def4", "#908caa", "#c4a7e7", "#ebbcba"),
+    },
+    "kanagawa": {
+        "base": "ledger", "decoration": "kanagawa",
+        # Lotus / Wave
+        "light": _light("#e7e0bd", "#f7f3dc", "#efe9cc", "#545464", "#6f6f7f", "#4d699b", "#624c83"),
+        "dark":  _dark("#16161d", "#1f1f28", "#2a2a37", "#dcd7ba", "#a6a69c", "#7e9cd8", "#957fb8"),
+    },
+    "ayu": {
+        "base": "ledger", "decoration": "ayu",
+        # Light / Mirage
+        "light": _light("#f0f1f2", "#fcfcfc", "#f5f6f7", "#41464b", "#5c6166", "#fa8d3e", "#f07171"),
+        "dark":  _dark("#1a1f29", "#242936", "#2b3140", "#cccac2", "#9a9a95", "#ffcc66", "#ffa659"),
+    },
+    "material": {
+        "base": "ledger", "decoration": "material",
+        # Lighter / Ocean
+        "light": _light("#e7ecef", "#fafafa", "#f2f4f5", "#263238", "#546e7a", "#6182b8", "#39adb5"),
+        "dark":  _dark("#1e272c", "#263238", "#2e3c43", "#eeffff", "#b0bec5", "#82aaff", "#89ddff"),
+    },
+    # Class themes — ledger baseline + surfaces tinted toward the class color
     **{name: _class_theme_entry(accent) for name, accent in CLASS_THEME_COLORS.items()},
+}
+
+# Retired names from when each light/dark variant was its own theme. They still
+# resolve (so existing commands keep working) and pick the matching color mode
+# when no explicit --mode is given.
+THEME_ALIASES: dict[str, tuple[str, str]] = {
+    "catppuccin-latte": ("catppuccin", "light"),
+    "rose-pine-dawn":   ("rose-pine", "light"),
+    "everforest-light": ("everforest", "light"),
+    "gruvbox-light":    ("gruvbox", "light"),
+    "ayu-light":        ("ayu", "light"),
+    "ayu-mirage":       ("ayu", "dark"),
 }
 
 
 def resolve_theme_entry(theme: str | None) -> tuple[str, dict] | None:
-    """Resolve theme name (class, curated, layout, or hex) → (label, entry). Returns None if no theme."""
+    """Resolve theme name (class, curated, layout, alias, or hex) → (label, entry). Returns None if no theme.
+
+    An alias resolves to its target theme's entry plus a ``default_mode`` hint.
+    """
     if not theme:
         return None
     if theme in THEMES:
         return theme, dict(THEMES[theme])
+    if theme in THEME_ALIASES:
+        target, mode = THEME_ALIASES[theme]
+        return theme, {**THEMES[target], "default_mode": mode}
     if HEX_COLOR_RE.match(theme):
         normalized = theme if theme.startswith("#") else f"#{theme}"
         return normalized, _class_theme_entry(normalized)
     raise ValueError(f"Unknown theme {theme!r}")
 
 
+def _mode_backgrounds(palette: dict[str, str], dark: bool) -> tuple[str, str, str]:
+    """Opaque paper, page, and panel colors as actually painted (rgba layers flattened)."""
+    paper = flatten_color(palette["paper"], "#000000" if dark else "#ffffff")
+    panel = flatten_color(palette["panel"], paper)
+    panel_soft = flatten_color(palette["panel_soft"], panel)
+    return paper, panel, panel_soft
+
+
+def ensure_contrast(color: str, backgrounds: tuple[str, ...], target: float) -> str:
+    """Darken (light surfaces) or lighten (dark surfaces) ``color`` until it meets ``target`` on every background.
+
+    Only HLS lightness moves, so hue and saturation survive. Colors that already
+    pass are returned unchanged, so a scheme's own hexes stay wherever they are
+    readable.
+    """
+    if min(contrast_ratio(color, bg) for bg in backgrounds) >= target:
+        return color
+    direction = -1 if relative_luminance(backgrounds[0]) > 0.18 else 1
+    r, g, b = (channel / 255 for channel in _hex_to_rgb(color))
+    hue, lightness, saturation = colorsys.rgb_to_hls(r, g, b)
+    for step in range(1, 101):
+        new_lightness = min(1.0, max(0.0, lightness + direction * step / 100))
+        r, g, b = colorsys.hls_to_rgb(hue, new_lightness, saturation)
+        candidate = _rgb_to_hex(round(r * 255), round(g * 255), round(b * 255))
+        if min(contrast_ratio(candidate, bg) for bg in backgrounds) >= target:
+            return candidate
+    return "#000000" if direction < 0 else "#ffffff"
+
+
+def _on_accent(accent: str, paper: str) -> str:
+    """Text color for accent-filled buttons and tokens: the paper color if legible, else black or white."""
+    if contrast_ratio(paper, accent) >= TEXT_CONTRAST:
+        return paper
+    return max(("#ffffff", "#111111"), key=lambda ink: contrast_ratio(ink, accent))
+
+
+def resolve_mode_palette(palette: dict[str, str], dark: bool) -> dict[str, str]:
+    """Apply the contrast guardrails to one color mode of a theme."""
+    backgrounds = _mode_backgrounds(palette, dark)
+    out = dict(palette)
+    out["ink_soft"] = ensure_contrast(palette["ink_soft"], backgrounds, TEXT_CONTRAST)
+    out["accent"] = ensure_contrast(palette["accent"], backgrounds, TEXT_CONTRAST)
+    out["accent_strong"] = ensure_contrast(palette["accent_strong"], backgrounds, GRAPHIC_CONTRAST)
+    out["on_accent"] = _on_accent(out["accent"], backgrounds[0])
+    return out
+
+
+def build_theme_palette(entry: dict) -> dict[str, dict[str, str]]:
+    """Render-ready palette for a theme entry: both color modes, contrast-checked."""
+    return {
+        "light": resolve_mode_palette(entry["light"], dark=False),
+        "dark": resolve_mode_palette(entry["dark"], dark=True),
+    }
+
+
+# Per-palette flavor on top of the colors: font stacks, the letter-spacing of
+# uppercase display text, how strongly the accents glow in the page margins,
+# and whether panels get a faint diagonal accent sheen. Glows and sheens are
+# mixed from the live --accent variables, so they follow the color mode.
+PALETTE_DECORATIONS: dict[str, dict[str, Any]] = {
+    "dracula": {
+        "fonts": ('"Literata", "Source Serif 4", "Georgia", "Times New Roman", serif',
+                  '"Space Grotesk", "Avenir Next Condensed", "Helvetica Neue", sans-serif',
+                  '"IBM Plex Sans", "Segoe UI", sans-serif'),
+        "tracking": "0.16em", "glow": 18, "sheen": True,
+    },
+    "catppuccin": {
+        "fonts": ('"Fraunces", "Source Serif 4", "Georgia", serif',
+                  '"Sora", "Avenir Next", "Helvetica Neue", sans-serif',
+                  '"IBM Plex Sans", "Segoe UI", sans-serif'),
+        "tracking": "0.14em", "glow": 12, "sheen": True,
+    },
+    "nord": {
+        "fonts": ('"Source Serif 4", "Iowan Old Style", "Georgia", serif',
+                  '"IBM Plex Sans Condensed", "IBM Plex Sans", "Helvetica Neue", sans-serif',
+                  '"IBM Plex Sans", "Segoe UI", sans-serif'),
+        "tracking": "0.18em", "glow": 16, "sheen": False,
+    },
+    "hearth": {
+        "fonts": ('"Tiempos Text", "Source Serif 4", "Georgia", serif',
+                  '"Styrene B", "Inter", "Helvetica Neue", sans-serif',
+                  '"Styrene B", "Inter", "Helvetica Neue", sans-serif'),
+        "tracking": "0.14em", "glow": 16, "sheen": False,
+    },
+    "solarized": {
+        "fonts": ('"Source Serif 4", "Source Serif Pro", "Georgia", serif',
+                  '"IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace',
+                  '"IBM Plex Sans", "Segoe UI", sans-serif'),
+        "tracking": "0.14em", "glow": 12, "sheen": False,
+    },
+    "everforest": {
+        "fonts": ('"Bitter", "Source Serif 4", "Georgia", serif',
+                  '"Quicksand", "Comfortaa", "Avenir Next", sans-serif',
+                  '"Mulish", "Inter", "Helvetica Neue", sans-serif'),
+        "tracking": "0.12em", "glow": 12, "sheen": False,
+    },
+    "gruvbox": {
+        "fonts": ('"Zilla Slab", "Roboto Slab", "Rockwell", "Georgia", serif',
+                  '"Zilla Slab", "Roboto Slab", "Rockwell", serif',
+                  '"Work Sans", "Inter", "Helvetica Neue", sans-serif'),
+        "tracking": "0.08em", "glow": 14, "sheen": True,
+    },
+    "tokyo-night": {
+        "fonts": ('"Spectral", "Source Serif 4", "Georgia", serif',
+                  '"Chakra Petch", "Space Grotesk", "Helvetica Neue", sans-serif',
+                  '"Inter", "Segoe UI", sans-serif'),
+        "tracking": "0.16em", "glow": 14, "sheen": True,
+    },
+    "one-dark": {
+        "fonts": ('"Newsreader", "Source Serif 4", "Georgia", serif',
+                  '"Manrope", "Inter", "Helvetica Neue", sans-serif',
+                  '"Inter", "Segoe UI", sans-serif'),
+        "tracking": "0.14em", "glow": 10, "sheen": False,
+    },
+    "rose-pine": {
+        "fonts": ('"Cormorant Garamond", "EB Garamond", "Georgia", serif',
+                  '"Marcellus", "Cormorant Garamond", "Georgia", serif',
+                  '"Jost", "Inter", "Helvetica Neue", sans-serif'),
+        "tracking": "0.18em", "glow": 14, "sheen": True,
+    },
+    "kanagawa": {
+        "fonts": ('"Shippori Mincho", "Zen Old Mincho", "Source Serif 4", "Georgia", serif',
+                  '"Zen Old Mincho", "Shippori Mincho", "Georgia", serif',
+                  '"Zen Kaku Gothic New", "Inter", "Helvetica Neue", sans-serif'),
+        "tracking": "0.18em", "glow": 16, "sheen": True,
+    },
+    "ayu": {
+        "fonts": ('"Source Serif 4", "Source Serif Pro", "Georgia", serif',
+                  '"Rubik", "Manrope", "Inter", "Helvetica Neue", sans-serif',
+                  '"Rubik", "Inter", "Helvetica Neue", sans-serif'),
+        "tracking": "0.14em", "glow": 14, "sheen": False,
+    },
+    "material": {
+        "fonts": ('"Roboto Slab", "Source Serif 4", "Georgia", serif',
+                  '"Roboto Condensed", "Roboto", "Helvetica Neue", sans-serif',
+                  '"Roboto", "Inter", "Helvetica Neue", sans-serif'),
+        "tracking": "0.12em", "glow": 12, "sheen": False,
+    },
+    # Class themes keep the ledger typography; they only get the accent glow.
+    "class": {"fonts": None, "tracking": None, "glow": 12, "sheen": False},
+}
+
+_DISPLAY_SELECTORS = (
+    ".dnd-layout-page-title",
+    ".dnd-layout-section-title",
+    ".dnd-layout-label",
+    ".dnd-layout-token",
+    ".dnd-layout-summary-card .value",
+    ".dnd-layout-mini-stat .value",
+    "button",
+)
+
+
 def _sheet_palette_css(palette: str | None) -> str:
-    if palette == "dracula":
-        return r"""
-        body.dnd-layout-palette-dracula {
-          --serif: "Literata", "Source Serif 4", "Georgia", "Times New Roman", serif;
-          --display: "Space Grotesk", "Avenir Next Condensed", "Helvetica Neue", sans-serif;
-          --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
-          background:
-            radial-gradient(circle at 16% 10%, rgba(189, 147, 249, 0.18), transparent 36%),
-            radial-gradient(circle at 82% 22%, rgba(139, 233, 253, 0.14), transparent 30%),
-            radial-gradient(circle at 80% 84%, rgba(255, 121, 198, 0.12), transparent 34%),
+    decor = PALETTE_DECORATIONS.get(palette or "")
+    if decor is None:
+        return ""
+    body = f"body.dnd-layout-palette-{palette}"
+    glow = decor["glow"]
+    font_vars = ""
+    if decor["fonts"]:
+        serif, display, sans = decor["fonts"]
+        font_vars = f"--serif: {serif};\n          --display: {display};\n          --sans: {sans};\n          "
+    css = f"""
+        {body} {{
+          {font_vars}background:
+            radial-gradient(circle at 14% 8%, color-mix(in srgb, var(--accent) {glow}%, transparent), transparent 38%),
+            radial-gradient(circle at 86% 92%, color-mix(in srgb, var(--accent-strong) {round(glow * 0.7)}%, transparent), transparent 40%),
             var(--paper);
-        }
-        body.dnd-layout-palette-dracula .dnd-layout-page-title,
-        body.dnd-layout-palette-dracula .dnd-layout-section-title,
-        body.dnd-layout-palette-dracula .dnd-layout-label,
-        body.dnd-layout-palette-dracula .dnd-layout-token,
-        body.dnd-layout-palette-dracula .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-dracula .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-dracula button {
+        }}
+        """
+    if decor["tracking"]:
+        selectors = ",\n        ".join(f"{body} {sel}" for sel in _DISPLAY_SELECTORS)
+        css += f"""
+        {selectors} {{
           font-family: var(--display);
-          letter-spacing: 0.16em;
+          letter-spacing: {decor["tracking"]};
           text-transform: uppercase;
-        }
-        body.dnd-layout-palette-dracula .dnd-layout-page { backdrop-filter: blur(3px); }
-        body.dnd-layout-palette-dracula .dnd-layout-panel::before {
+        }}
+        """
+    if decor["sheen"]:
+        css += f"""
+        {body} .dnd-layout-panel::before {{
           content: "";
           position: absolute;
           inset: 0;
-          background: linear-gradient(135deg, rgba(139, 233, 253, 0.08), transparent 42%);
+          background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 42%);
           pointer-events: none;
-        }
+        }}
+        @media print {{
+          {body}[data-theme="light"] .dnd-layout-panel::before {{ display: none; }}
+        }}
         """
-    if palette == "catppuccin":
-        return r"""
-        body.dnd-layout-palette-catppuccin {
-          --serif: "Fraunces", "Source Serif 4", "Georgia", serif;
-          --display: "Sora", "Avenir Next", "Helvetica Neue", sans-serif;
-          --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
-          background:
-            radial-gradient(circle at 18% 14%, rgba(136, 57, 239, 0.028), transparent 30%),
-            radial-gradient(circle at 82% 84%, rgba(30, 102, 245, 0.024), transparent 30%),
-            linear-gradient(180deg, rgba(220, 224, 232, 0.12), transparent 180px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-catppuccin .dnd-layout-page-title,
-        body.dnd-layout-palette-catppuccin .dnd-layout-section-title,
-        body.dnd-layout-palette-catppuccin .dnd-layout-label,
-        body.dnd-layout-palette-catppuccin .dnd-layout-token,
-        body.dnd-layout-palette-catppuccin .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-catppuccin .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-catppuccin button {
-          font-family: var(--display);
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-catppuccin .dnd-layout-panel::before,
-        body.dnd-layout-palette-catppuccin .dnd-layout-summary-card::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(136, 57, 239, 0.035), rgba(255, 255, 255, 0.015) 18%, transparent 34%);
-          pointer-events: none;
-        }
-        """
-    if palette == "nord":
-        return r"""
-        body.dnd-layout-palette-nord {
-          --serif: "Source Serif 4", "Iowan Old Style", "Georgia", serif;
-          --display: "IBM Plex Sans Condensed", "IBM Plex Sans", "Helvetica Neue", sans-serif;
-          --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
-          background:
-            radial-gradient(circle at 16% 12%, rgba(136, 192, 208, 0.18), transparent 32%),
-            radial-gradient(circle at 84% 16%, rgba(129, 161, 193, 0.12), transparent 30%),
-            linear-gradient(180deg, rgba(216, 222, 233, 0.78), transparent 240px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-nord .dnd-layout-page-title,
-        body.dnd-layout-palette-nord .dnd-layout-section-title,
-        body.dnd-layout-palette-nord .dnd-layout-label,
-        body.dnd-layout-palette-nord .dnd-layout-token,
-        body.dnd-layout-palette-nord .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-nord .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-nord button {
-          font-family: var(--display);
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-nord .dnd-layout-page,
-        body.dnd-layout-palette-nord .dnd-layout-panel {
-          border-color: rgba(94, 129, 172, 0.26);
-        }
-        """
-    if palette == "hearth":
-        return r"""
-        body.dnd-layout-palette-hearth {
-          --serif: "Tiempos Text", "Source Serif 4", "Georgia", serif;
-          --display: "Styrene B", "Inter", "Helvetica Neue", sans-serif;
-          --sans: "Styrene B", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 88% 6%, rgba(204, 120, 92, 0.18), transparent 38%),
-            radial-gradient(circle at 12% 92%, rgba(145, 86, 65, 0.06), transparent 42%),
-            linear-gradient(180deg, rgba(244, 237, 225, 0.55), transparent 240px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-hearth .dnd-layout-page-title,
-        body.dnd-layout-palette-hearth .dnd-layout-section-title,
-        body.dnd-layout-palette-hearth .dnd-layout-label,
-        body.dnd-layout-palette-hearth .dnd-layout-token,
-        body.dnd-layout-palette-hearth .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-hearth .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-hearth button {
-          font-family: var(--display);
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-        }
-        """
-    if palette == "solarized":
-        return r"""
-        body.dnd-layout-palette-solarized {
-          --serif: "Source Serif 4", "Source Serif Pro", "Georgia", serif;
-          --display: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
-          --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
-          background:
-            radial-gradient(circle at 16% 12%, rgba(38, 139, 210, 0.10), transparent 32%),
-            radial-gradient(circle at 84% 20%, rgba(42, 161, 152, 0.08), transparent 30%),
-            linear-gradient(180deg, rgba(238, 232, 213, 0.60), transparent 240px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-solarized .dnd-layout-page-title,
-        body.dnd-layout-palette-solarized .dnd-layout-section-title,
-        body.dnd-layout-palette-solarized .dnd-layout-label,
-        body.dnd-layout-palette-solarized .dnd-layout-token,
-        body.dnd-layout-palette-solarized .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-solarized .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-solarized button {
-          font-family: var(--display);
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-solarized .dnd-layout-page,
-        body.dnd-layout-palette-solarized .dnd-layout-panel {
-          border-color: rgba(38, 139, 210, 0.20);
-        }
-        """
-    if palette == "everforest":
-        return r"""
-        body.dnd-layout-palette-everforest {
-          --serif: "Bitter", "Source Serif 4", "Georgia", serif;
-          --display: "Quicksand", "Comfortaa", "Avenir Next", sans-serif;
-          --sans: "Mulish", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 14% 10%, rgba(141, 161, 1, 0.12), transparent 34%),
-            radial-gradient(circle at 86% 84%, rgba(245, 125, 38, 0.07), transparent 38%),
-            linear-gradient(180deg, rgba(239, 235, 212, 0.60), transparent 240px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-everforest .dnd-layout-page-title,
-        body.dnd-layout-palette-everforest .dnd-layout-section-title,
-        body.dnd-layout-palette-everforest .dnd-layout-label,
-        body.dnd-layout-palette-everforest .dnd-layout-token,
-        body.dnd-layout-palette-everforest .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-everforest .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-everforest button {
-          font-family: var(--display);
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-        }
-        """
-    if palette == "gruvbox":
-        return r"""
-        body.dnd-layout-palette-gruvbox {
-          --serif: "Zilla Slab", "Roboto Slab", "Rockwell", "Georgia", serif;
-          --display: "Zilla Slab", "Roboto Slab", "Rockwell", serif;
-          --sans: "Work Sans", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 16% 12%, rgba(215, 153, 33, 0.14), transparent 34%),
-            radial-gradient(circle at 84% 86%, rgba(214, 93, 14, 0.08), transparent 40%),
-            linear-gradient(180deg, rgba(242, 229, 188, 0.70), transparent 240px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-gruvbox .dnd-layout-page-title,
-        body.dnd-layout-palette-gruvbox .dnd-layout-section-title,
-        body.dnd-layout-palette-gruvbox .dnd-layout-label,
-        body.dnd-layout-palette-gruvbox .dnd-layout-token,
-        body.dnd-layout-palette-gruvbox .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-gruvbox .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-gruvbox button {
-          font-family: var(--display);
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-gruvbox .dnd-layout-panel::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, rgba(215, 153, 33, 0.07), transparent 44%);
-          pointer-events: none;
-        }
-        """
-    if palette == "tokyo-night":
-        return r"""
-        body.dnd-layout-palette-tokyo-night {
-          --serif: "Spectral", "Source Serif 4", "Georgia", serif;
-          --display: "Chakra Petch", "Space Grotesk", "Helvetica Neue", sans-serif;
-          --sans: "Inter", "Segoe UI", sans-serif;
-          background:
-            radial-gradient(circle at 16% 10%, rgba(46, 125, 233, 0.10), transparent 34%),
-            radial-gradient(circle at 82% 22%, rgba(152, 84, 241, 0.08), transparent 30%),
-            radial-gradient(circle at 80% 84%, rgba(0, 113, 151, 0.06), transparent 34%),
-            linear-gradient(180deg, rgba(225, 226, 231, 0.50), transparent 220px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-tokyo-night .dnd-layout-page-title,
-        body.dnd-layout-palette-tokyo-night .dnd-layout-section-title,
-        body.dnd-layout-palette-tokyo-night .dnd-layout-label,
-        body.dnd-layout-palette-tokyo-night .dnd-layout-token,
-        body.dnd-layout-palette-tokyo-night .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-tokyo-night .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-tokyo-night button {
-          font-family: var(--display);
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-tokyo-night .dnd-layout-page { backdrop-filter: blur(3px); }
-        body.dnd-layout-palette-tokyo-night .dnd-layout-panel::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, rgba(152, 84, 241, 0.07), transparent 42%);
-          pointer-events: none;
-        }
-        """
-    if palette == "one-dark":
-        return r"""
-        body.dnd-layout-palette-one-dark {
-          --serif: "Newsreader", "Source Serif 4", "Georgia", serif;
-          --display: "Manrope", "Inter", "Helvetica Neue", sans-serif;
-          --sans: "Inter", "Segoe UI", sans-serif;
-          background:
-            radial-gradient(circle at 16% 12%, rgba(64, 120, 242, 0.09), transparent 32%),
-            radial-gradient(circle at 84% 84%, rgba(166, 38, 164, 0.06), transparent 34%),
-            linear-gradient(180deg, rgba(236, 238, 242, 0.55), transparent 220px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-one-dark .dnd-layout-page-title,
-        body.dnd-layout-palette-one-dark .dnd-layout-section-title,
-        body.dnd-layout-palette-one-dark .dnd-layout-label,
-        body.dnd-layout-palette-one-dark .dnd-layout-token,
-        body.dnd-layout-palette-one-dark .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-one-dark .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-one-dark button {
-          font-family: var(--display);
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-        }
-        """
-    if palette == "catppuccin-latte":
-        return r"""
-        body.dnd-layout-palette-catppuccin-latte {
-          --serif: "Fraunces", "Source Serif 4", "Georgia", serif;
-          --display: "Comfortaa", "Quicksand", "Avenir Next", sans-serif;
-          --sans: "Nunito Sans", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 18% 14%, rgba(136, 57, 239, 0.06), transparent 30%),
-            radial-gradient(circle at 82% 84%, rgba(30, 102, 245, 0.05), transparent 30%),
-            linear-gradient(180deg, rgba(230, 233, 239, 0.70), transparent 200px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-catppuccin-latte .dnd-layout-page-title,
-        body.dnd-layout-palette-catppuccin-latte .dnd-layout-section-title,
-        body.dnd-layout-palette-catppuccin-latte .dnd-layout-label,
-        body.dnd-layout-palette-catppuccin-latte .dnd-layout-token,
-        body.dnd-layout-palette-catppuccin-latte .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-catppuccin-latte .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-catppuccin-latte button {
-          font-family: var(--display);
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-catppuccin-latte .dnd-layout-panel::before,
-        body.dnd-layout-palette-catppuccin-latte .dnd-layout-summary-card::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(136, 57, 239, 0.05), rgba(255, 255, 255, 0.02) 18%, transparent 34%);
-          pointer-events: none;
-        }
-        """
-    if palette == "rose-pine":
-        return r"""
-        body.dnd-layout-palette-rose-pine {
-          --serif: "Cormorant Garamond", "EB Garamond", "Georgia", serif;
-          --display: "Marcellus", "Cormorant Garamond", "Georgia", serif;
-          --sans: "Jost", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 16% 10%, rgba(196, 167, 231, 0.12), transparent 34%),
-            radial-gradient(circle at 84% 22%, rgba(235, 188, 186, 0.10), transparent 30%),
-            radial-gradient(circle at 80% 86%, rgba(49, 116, 143, 0.06), transparent 34%),
-            linear-gradient(180deg, rgba(242, 233, 234, 0.50), transparent 220px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-rose-pine .dnd-layout-page-title,
-        body.dnd-layout-palette-rose-pine .dnd-layout-section-title,
-        body.dnd-layout-palette-rose-pine .dnd-layout-label,
-        body.dnd-layout-palette-rose-pine .dnd-layout-token,
-        body.dnd-layout-palette-rose-pine .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-rose-pine .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-rose-pine button {
-          font-family: var(--display);
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-rose-pine .dnd-layout-panel::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, rgba(196, 167, 231, 0.08), transparent 44%);
-          pointer-events: none;
-        }
-        """
-    if palette == "rose-pine-dawn":
-        return r"""
-        body.dnd-layout-palette-rose-pine-dawn {
-          --serif: "EB Garamond", "Cormorant Garamond", "Georgia", serif;
-          --display: "Cormorant Garamond", "EB Garamond", "Georgia", serif;
-          --sans: "Jost", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 88% 8%, rgba(215, 130, 126, 0.12), transparent 38%),
-            radial-gradient(circle at 12% 90%, rgba(40, 105, 131, 0.06), transparent 42%),
-            linear-gradient(180deg, rgba(255, 250, 243, 0.70), transparent 240px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-page-title,
-        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-section-title,
-        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-label,
-        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-token,
-        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-rose-pine-dawn .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-rose-pine-dawn button {
-          font-family: var(--display);
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-        }
-        """
-    if palette == "kanagawa":
-        return r"""
-        body.dnd-layout-palette-kanagawa {
-          --serif: "Shippori Mincho", "Zen Old Mincho", "Source Serif 4", "Georgia", serif;
-          --display: "Zen Old Mincho", "Shippori Mincho", "Georgia", serif;
-          --sans: "Zen Kaku Gothic New", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 16% 12%, rgba(126, 156, 216, 0.16), transparent 36%),
-            radial-gradient(circle at 84% 20%, rgba(106, 149, 137, 0.10), transparent 30%),
-            radial-gradient(circle at 80% 86%, rgba(220, 165, 97, 0.07), transparent 34%),
-            linear-gradient(180deg, rgba(220, 215, 186, 0.40), transparent 240px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-kanagawa .dnd-layout-page-title,
-        body.dnd-layout-palette-kanagawa .dnd-layout-section-title,
-        body.dnd-layout-palette-kanagawa .dnd-layout-label,
-        body.dnd-layout-palette-kanagawa .dnd-layout-token,
-        body.dnd-layout-palette-kanagawa .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-kanagawa .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-kanagawa button {
-          font-family: var(--display);
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-kanagawa .dnd-layout-panel::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, rgba(126, 156, 216, 0.10), transparent 46%);
-          pointer-events: none;
-        }
-        """
-    if palette == "gruvbox-light":
-        return r"""
-        body.dnd-layout-palette-gruvbox-light {
-          --serif: "Zilla Slab", "Roboto Slab", "Rockwell", "Georgia", serif;
-          --display: "Zilla Slab", "Roboto Slab", "Rockwell", serif;
-          --sans: "Work Sans", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 88% 8%, rgba(157, 0, 6, 0.10), transparent 38%),
-            radial-gradient(circle at 12% 90%, rgba(181, 118, 20, 0.08), transparent 42%),
-            linear-gradient(180deg, rgba(251, 241, 199, 0.85), transparent 240px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-gruvbox-light .dnd-layout-page-title,
-        body.dnd-layout-palette-gruvbox-light .dnd-layout-section-title,
-        body.dnd-layout-palette-gruvbox-light .dnd-layout-label,
-        body.dnd-layout-palette-gruvbox-light .dnd-layout-token,
-        body.dnd-layout-palette-gruvbox-light .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-gruvbox-light .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-gruvbox-light button {
-          font-family: var(--display);
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-gruvbox-light .dnd-layout-panel::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, rgba(157, 0, 6, 0.05), transparent 44%);
-          pointer-events: none;
-        }
-        """
-    if palette == "ayu-light":
-        return r"""
-        body.dnd-layout-palette-ayu-light {
-          --serif: "Source Serif 4", "Source Serif Pro", "Georgia", serif;
-          --display: "Rubik", "Manrope", "Inter", "Helvetica Neue", sans-serif;
-          --sans: "Rubik", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 88% 8%, rgba(250, 141, 62, 0.12), transparent 38%),
-            radial-gradient(circle at 12% 90%, rgba(57, 158, 230, 0.07), transparent 42%),
-            linear-gradient(180deg, rgba(252, 252, 252, 0.80), transparent 220px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-ayu-light .dnd-layout-page-title,
-        body.dnd-layout-palette-ayu-light .dnd-layout-section-title,
-        body.dnd-layout-palette-ayu-light .dnd-layout-label,
-        body.dnd-layout-palette-ayu-light .dnd-layout-token,
-        body.dnd-layout-palette-ayu-light .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-ayu-light .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-ayu-light button {
-          font-family: var(--display);
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-ayu-light .dnd-layout-page,
-        body.dnd-layout-palette-ayu-light .dnd-layout-panel {
-          border-color: rgba(250, 141, 62, 0.22);
-        }
-        """
-    if palette == "ayu-mirage":
-        return r"""
-        body.dnd-layout-palette-ayu-mirage {
-          --serif: "Source Serif 4", "Source Serif Pro", "Georgia", serif;
-          --display: "Rubik", "Manrope", "Inter", "Helvetica Neue", sans-serif;
-          --sans: "Rubik", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 16% 12%, rgba(57, 158, 230, 0.10), transparent 34%),
-            radial-gradient(circle at 84% 84%, rgba(240, 113, 113, 0.07), transparent 36%),
-            linear-gradient(180deg, rgba(225, 230, 237, 0.55), transparent 220px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-ayu-mirage .dnd-layout-page-title,
-        body.dnd-layout-palette-ayu-mirage .dnd-layout-section-title,
-        body.dnd-layout-palette-ayu-mirage .dnd-layout-label,
-        body.dnd-layout-palette-ayu-mirage .dnd-layout-token,
-        body.dnd-layout-palette-ayu-mirage .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-ayu-mirage .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-ayu-mirage button {
-          font-family: var(--display);
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-ayu-mirage .dnd-layout-panel::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, rgba(57, 158, 230, 0.07), transparent 42%);
-          pointer-events: none;
-        }
-        """
-    if palette == "material":
-        return r"""
-        body.dnd-layout-palette-material {
-          --serif: "Roboto Slab", "Source Serif 4", "Georgia", serif;
-          --display: "Roboto Condensed", "Roboto", "Helvetica Neue", sans-serif;
-          --sans: "Roboto", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 16% 12%, rgba(97, 130, 184, 0.12), transparent 34%),
-            radial-gradient(circle at 84% 84%, rgba(57, 173, 181, 0.08), transparent 36%),
-            linear-gradient(180deg, rgba(236, 239, 241, 0.75), transparent 220px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-material .dnd-layout-page-title,
-        body.dnd-layout-palette-material .dnd-layout-section-title,
-        body.dnd-layout-palette-material .dnd-layout-label,
-        body.dnd-layout-palette-material .dnd-layout-token,
-        body.dnd-layout-palette-material .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-material .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-material button {
-          font-family: var(--display);
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-material .dnd-layout-page,
-        body.dnd-layout-palette-material .dnd-layout-panel {
-          border-color: rgba(97, 130, 184, 0.22);
-        }
-        """
-    if palette == "everforest-light":
-        return r"""
-        body.dnd-layout-palette-everforest-light {
-          --serif: "Bitter", "Source Serif 4", "Georgia", serif;
-          --display: "Mulish", "Quicksand", "Avenir Next", sans-serif;
-          --sans: "Mulish", "Inter", "Helvetica Neue", sans-serif;
-          background:
-            radial-gradient(circle at 88% 8%, rgba(53, 167, 124, 0.11), transparent 38%),
-            radial-gradient(circle at 12% 90%, rgba(58, 148, 197, 0.07), transparent 42%),
-            linear-gradient(180deg, rgba(253, 246, 227, 0.80), transparent 240px),
-            var(--paper);
-        }
-        body.dnd-layout-palette-everforest-light .dnd-layout-page-title,
-        body.dnd-layout-palette-everforest-light .dnd-layout-section-title,
-        body.dnd-layout-palette-everforest-light .dnd-layout-label,
-        body.dnd-layout-palette-everforest-light .dnd-layout-token,
-        body.dnd-layout-palette-everforest-light .dnd-layout-summary-card .value,
-        body.dnd-layout-palette-everforest-light .dnd-layout-mini-stat .value,
-        body.dnd-layout-palette-everforest-light button {
-          font-family: var(--display);
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-        }
-        body.dnd-layout-palette-everforest-light .dnd-layout-page,
-        body.dnd-layout-palette-everforest-light .dnd-layout-panel {
-          border-color: rgba(53, 167, 124, 0.20);
-        }
-        """
-    return ""
+    return css
+
+
+# Open-licensed fonts (see fonts/licenses/) are inlined into each sheet so it
+# looks the same on every machine, offline and in PDF export. Rebuild the set
+# with tools/fetch_fonts.py.
+FONTS_DIR = Path(__file__).resolve().parent / "fonts"
+_FONT_ROLES = ("serif", "display", "sans", "mono")
+_FONT_STACK_RE = re.compile(r"--(serif|display|sans|mono):\s*([^;]+);")
+
+
+@lru_cache(maxsize=1)
+def _font_manifest() -> dict[str, Any]:
+    try:
+        return json.loads((FONTS_DIR / "fonts.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def theme_font_families(style: str, palette: str | None) -> list[str]:
+    """Bundled families a theme renders with: the first bundled family of each font role's stack."""
+    stacks: dict[str, str] = {}
+    for role, stack in _FONT_STACK_RE.findall(_sheet_theme_css(style)):
+        stacks.setdefault(role, stack)  # the first declaration is the layout's :root
+    decor = PALETTE_DECORATIONS.get(palette or "")
+    if decor and decor["fonts"]:
+        stacks.update(zip(("serif", "display", "sans"), decor["fonts"], strict=True))
+    manifest = _font_manifest()
+    families: list[str] = []
+    for role in _FONT_ROLES:
+        for family in (part.strip().strip("\"'") for part in stacks.get(role, "").split(",")):
+            if family in manifest:
+                if family not in families:
+                    families.append(family)
+                break
+    return families
+
+
+@cache
+def _font_face_css(family: str) -> str:
+    rules = []
+    for face in _font_manifest()[family]["faces"]:
+        data = base64.b64encode((FONTS_DIR / face["file"]).read_bytes()).decode("ascii")
+        rules.append(
+            f'@font-face {{ font-family: "{family}"; font-style: {face["style"]}; '
+            f'font-weight: {face["weight"]}; font-display: block; '
+            f'src: url(data:font/woff2;base64,{data}) format("woff2"); }}'
+        )
+    return "\n".join(rules)
+
+
+def embedded_font_css(style: str, palette: str | None) -> str:
+    """@font-face rules (base64 WOFF2) for the fonts this theme uses; empty if fonts are not bundled."""
+    return "\n".join(_font_face_css(family) for family in theme_font_families(style, palette))
 
 
 def _sheet_theme_css(style: str) -> str:
@@ -1978,6 +1905,8 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
     def blank_zero(value: Any) -> Any:
         return "" if value in (None, "", 0, 0.0, "0") else value
 
+    emblem = emblems.emblem_svg(data.get("class_slug"), "dnd-layout-emblem")
+
     save_map = {row["label"]: row for row in data["saving_throw_rows"]}
     skills_by_ability: dict[str, list[dict[str, Any]]] = {}
     for row in data["skill_rows"]:
@@ -2086,6 +2015,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
           <div>
             <div class="dnd-layout-page-title">Spellcasting</div>
           </div>
+          {emblem}
         </div>
 
         <section class="dnd-layout-spell-summary">
@@ -2143,6 +2073,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
             <div class="dnd-layout-page-title">{esc(data["name"])}</div>
             <div class="dnd-layout-page-subtitle">{esc(data["class_line"])}{(' · ' + esc(data["subclass"])) if data["subclass"] else ''}</div>
           </div>
+          {emblem}
         </div>
 
         <div class="dnd-layout-header-grid">
@@ -2317,6 +2248,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
             <div class="dnd-layout-page-title">Equipment & Notes</div>
             <div class="dnd-layout-page-subtitle">Gear, appearance, and character background.</div>
           </div>
+          {emblem}
         </div>
 
         <div class="dnd-layout-third-grid">
@@ -2343,7 +2275,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
 
     style_css = _sheet_theme_css(style) + _sheet_palette_css(palette) + r"""
     * { box-sizing: border-box; }
-    html, body { margin: 0; color: var(--ink); font-family: var(--serif); -webkit-font-smoothing: antialiased; }
+    html, body { margin: 0; color: var(--ink); font-family: var(--serif); font-variant-numeric: lining-nums; -webkit-font-smoothing: antialiased; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; text-underline-offset: 0.14em; }
     .dnd-layout-shell {
@@ -2393,7 +2325,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       border-radius: 999px;
       padding: 10px 14px;
       background: var(--accent);
-      color: var(--paper);
+      color: var(--on-accent, var(--paper));
       font-size: 0.76rem;
       line-height: 1.1;
       min-height: 38px;
@@ -2428,6 +2360,13 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       border-bottom: 1px solid var(--rule-soft);
     }
     .dnd-layout-page-head > div:first-of-type { padding: 2px 0 0 4px; }
+    .dnd-layout-emblem {
+      flex: none;
+      width: 40px;
+      height: 40px;
+      margin: 10px 4px 0 0;
+      color: var(--accent);
+    }
     .dnd-layout-attribution {
       position: absolute;
       top: 2px;
@@ -2503,6 +2442,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       padding: 2px 0 4px;
       color: var(--ink);
       font: 600 1rem/1.2 var(--serif);
+      font-variant-numeric: lining-nums;
       outline: none;
       border-radius: 0;
     }
@@ -2798,7 +2738,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       font-size: 0.7rem;
     }
     .dnd-layout-token.active {
-      color: var(--paper);
+      color: var(--on-accent, var(--paper));
       background: var(--accent);
       border-color: var(--accent);
     }
@@ -3060,6 +3000,7 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
         flex-direction: column;
         align-items: stretch;
       }
+      .dnd-layout-emblem { display: none; }
       .dnd-layout-toolbar-actions {
         justify-content: flex-start;
         min-width: 0;
@@ -3100,10 +3041,13 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
       .dnd-layout-spell-page,
       .dnd-layout-equipment-page { break-before: page; }
       .dnd-layout-page-head {
+        flex-direction: row;
+        align-items: flex-start;
         margin-bottom: 8px;
         padding-bottom: 6px;
       }
       .dnd-layout-page-head > div:first-of-type { padding: 1px 0 0 2px; }
+      .dnd-layout-emblem { display: block; width: 30px; height: 30px; margin-top: 6px; }
       .dnd-layout-page-title { font-size: 1.24rem; }
       .dnd-layout-page-subtitle {
         margin-top: 3px;
@@ -3485,62 +3429,19 @@ def render_dnd_layout_template(data: dict[str, Any], sheet_id: str, style: str =
 """
 
 
-def _sheet_mode_overrides(style: str, theme_palette: dict[str, str] | None = None) -> str:
-    dark_palette = {
-        "ledger": {
-            "paper": "#0f1114",
-            "panel": "rgba(24, 27, 34, 0.94)",
-            "panel_soft": "rgba(34, 38, 48, 0.62)",
-            "ink": "#ecdcbd",
-            "ink_soft": "#a8a091",
-            "rule": "rgba(236, 220, 189, 0.72)",
-            "rule_soft": "rgba(236, 220, 189, 0.16)",
-            "shadow": "0 24px 52px rgba(0, 0, 0, 0.55)",
-            "accent": "#f39c7e",
-            "accent_strong": "#f39c7e",
-        },
-        "gazette": {
-            "paper": "#15120f",
-            "panel": "rgba(30, 26, 21, 0.94)",
-            "panel_soft": "rgba(55, 47, 39, 0.64)",
-            "ink": "#f3e8cf",
-            "ink_soft": "#b8ab95",
-            "rule": "rgba(243, 232, 207, 0.72)",
-            "rule_soft": "rgba(243, 232, 207, 0.18)",
-            "shadow": "0 24px 52px rgba(0, 0, 0, 0.58)",
-            "accent": "#e7d3a3",
-            "accent_strong": "#c7a558",
-        },
-        "grimoire": {
-            "paper": "#121117",
-            "panel": "rgba(24, 22, 19, 0.95)",
-            "panel_soft": "rgba(46, 39, 31, 0.66)",
-            "ink": "#f0e0bb",
-            "ink_soft": "#aa9777",
-            "rule": "rgba(240, 224, 187, 0.72)",
-            "rule_soft": "rgba(240, 224, 187, 0.16)",
-            "shadow": "0 26px 58px rgba(0, 0, 0, 0.58)",
-            "accent": "#e9c26a",
-            "accent_strong": "#c79a3a",
-        },
-    }.get(style, {
-        "paper": "#0f1114",
-        "panel": "rgba(24, 27, 34, 0.94)",
-        "panel_soft": "rgba(34, 38, 48, 0.62)",
-        "ink": "#ecdcbd",
-        "ink_soft": "#a8a091",
-        "rule": "rgba(236, 220, 189, 0.72)",
-        "rule_soft": "rgba(236, 220, 189, 0.16)",
-        "shadow": "0 24px 52px rgba(0, 0, 0, 0.55)",
-        "accent": "#f39c7e",
-        "accent_strong": "#f39c7e",
-    })
-    if theme_palette:
-        dark_palette = {
-            **dark_palette,
-            "accent": theme_palette["dark_accent"],
-            "accent_strong": theme_palette["dark_accent_strong"],
-        }
+def _mode_vars(palette: dict[str, str]) -> str:
+    return "\n".join(
+        f"      --{key.replace('_', '-')}: {palette[key]};"
+        for key in ("paper", "panel", "panel_soft", "ink", "ink_soft", "rule", "rule_soft",
+                    "shadow", "accent", "accent_strong", "on_accent")
+    )
+
+
+def _sheet_mode_overrides(style: str, theme_palette: dict[str, dict[str, str]] | None = None) -> str:
+    if theme_palette is None:
+        theme_palette = build_theme_palette(THEMES.get(style, THEMES["ledger"]))
+    light_vars = _mode_vars(theme_palette["light"])
+    dark_vars = _mode_vars(theme_palette["dark"])
     base = f"""
     /* Native sheet overrides: sharp corners + corner brackets + mode-aware palettes */
     :root {{
@@ -3672,21 +3573,17 @@ def _sheet_mode_overrides(style: str, theme_palette: dict[str, str] | None = Non
       margin-bottom: 10px;
     }}
 
+    :root {{
+{light_vars}
+    }}
     body.sheet-theme-{style}[data-theme="dark"] {{
-      --paper: {dark_palette["paper"]};
-      --panel: {dark_palette["panel"]};
-      --panel-soft: {dark_palette["panel_soft"]};
-      --ink: {dark_palette["ink"]};
-      --ink-soft: {dark_palette["ink_soft"]};
-      --rule: {dark_palette["rule"]};
-      --rule-soft: {dark_palette["rule_soft"]};
-      --shadow: {dark_palette["shadow"]};
-      --accent: {dark_palette["accent"]};
-      --accent-strong: {dark_palette["accent_strong"]};
+{dark_vars}
     }}
     body[data-theme="dark"] {{
-      background: var(--paper) !important;
       color: var(--ink);
+    }}
+    body[data-theme="dark"]:not([class*="sheet-palette-"]) {{
+      background: var(--paper) !important;
     }}
     body[data-theme="dark"] .slot-pip span {{
       background: rgba(255, 255, 255, 0.06);
@@ -3711,7 +3608,7 @@ def _sheet_mode_overrides(style: str, theme_palette: dict[str, str] | None = Non
       background: rgba(255, 255, 255, 0.04);
     }}
     body[data-theme="dark"] .sheet-token.active {{
-      color: #fff !important;
+      color: var(--on-accent) !important;
     }}
     body[data-theme="dark"] .sheet-inspiration span {{
       background: transparent;
@@ -3823,10 +3720,12 @@ def _sheet_mode_overrides(style: str, theme_palette: dict[str, str] | None = Non
 
     @media print {{
       body[data-theme="light"] {{
+        --paper: #ffffff !important;
         --panel: #ffffff !important;
         --panel-soft: rgba(0, 0, 0, 0.025) !important;
         --rule-soft: rgba(17, 17, 17, 0.18) !important;
         --shadow: none !important;
+        background: #ffffff !important;
       }}
       body[data-theme="dark"] {{ background: var(--paper) !important; }}
       body[data-theme="mono"] {{ background: #ffffff !important; }}
@@ -3835,14 +3734,6 @@ def _sheet_mode_overrides(style: str, theme_palette: dict[str, str] | None = Non
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }}
-    }}
-    """
-    if theme_palette:
-        base += f"""
-    /* Theme-driven accent (light mode) */
-    :root {{
-      --accent: {theme_palette["light_accent"]};
-      --accent-strong: {theme_palette["light_accent_strong"]};
     }}
     """
     return base
@@ -3891,7 +3782,7 @@ def render_character_sheet(
     sheet_id: str,
     style: str = "ledger",
     initial_theme: str | None = None,
-    theme_palette: dict[str, str] | None = None,
+    theme_palette: dict[str, dict[str, str]] | None = None,
     palette_decoration: str | None = None,
     include_footer: bool = True,
     paper: str = "a4",
@@ -3909,7 +3800,8 @@ def render_character_sheet(
     html = html.replace("@page { size: A4; margin: 9mm; }", f"@page {{ {PAPER_PROFILES[paper]} }}")
 
     overrides = _sheet_mode_overrides(style, theme_palette=theme_palette)
-    html = html.replace("</style>", overrides + "</style>", 1)
+    fonts = embedded_font_css(style, palette_decoration)
+    html = html.replace("</style>", overrides + fonts + "\n</style>", 1)
 
     toggle_btn = '<button type="button" id="print-sheet">Print / Save PDF</button>'
     new_btns = (
@@ -3977,7 +3869,7 @@ class Dnd5eAdapter:
         *,
         style: str,
         initial_theme: str | None,
-        theme_palette: dict[str, str] | None,
+        theme_palette: dict[str, dict[str, str]] | None,
         palette_decoration: str | None,
         include_footer: bool,
         paper: str,
@@ -4009,12 +3901,7 @@ def _render_one_theme(
     adapter: systems.SystemAdapter = DND5E_ADAPTER,
 ) -> Path:
     html_path = output_dir / f"{sheet_id}-character-sheet-{theme_label.lstrip('#')}.html"
-    palette = {
-        "light_accent":        entry["light_accent"],
-        "light_accent_strong": entry["light_accent_strong"],
-        "dark_accent":         entry["dark_accent"],
-        "dark_accent_strong":  entry["dark_accent_strong"],
-    }
+    palette = build_theme_palette(entry)
     # Always write UTF-8: the sheet HTML contains non-latin1 glyphs (e.g. the
     # ☾ dark-mode toggle, em dashes), and Path.write_text otherwise uses the
     # platform default encoding (cp1252 on Windows), which cannot encode them.
@@ -4022,7 +3909,7 @@ def _render_one_theme(
         context,
         sheet_id,
         style=entry["base"],
-        initial_theme=mode,
+        initial_theme=mode or entry.get("default_mode"),
         theme_palette=palette,
         palette_decoration=entry.get("decoration"),
         include_footer=include_footer,
@@ -4190,7 +4077,7 @@ def render_pdf(html_path: Path, pdf_path: Path, browser: str, mode: str | None =
 
 def parse_theme_arg(value: str) -> str:
     name = value.strip()
-    if name in THEMES:
+    if name in THEMES or name in THEME_ALIASES:
         return name
     if HEX_COLOR_RE.match(name):
         return name if name.startswith("#") else f"#{name}"
