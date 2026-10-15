@@ -4,7 +4,7 @@ a = Analysis(
     ["char2pdf_desktop.py"],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[("fonts", "fonts")],  # embedded into every sheet; see tools/fetch_fonts.py
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

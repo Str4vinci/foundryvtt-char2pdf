@@ -94,22 +94,20 @@ def theme_list() -> list[dict]:
     for name, entry in gen.THEMES.items():
         if name in _LAYOUT_THEMES:
             group = "Layouts"
-        elif entry.get("decoration"):
-            group = "Curated palettes"
-        else:
+        elif name in gen.CLASS_THEME_COLORS:
             group = "Class themes"
+        else:
+            group = "Curated palettes"
+        palette = gen.build_theme_palette(entry)
         out.append({
             "name": name,
-            "light_accent": entry["light_accent"],
-            "dark_accent": entry["dark_accent"],
+            "light_accent": palette["light"]["accent"],
+            "dark_accent": palette["dark"]["accent"],
+            "light_paper": palette["light"]["paper"],
+            "dark_paper": palette["dark"]["paper"],
             "group": group,
         })
     return out
-
-
-def _palette(entry: dict) -> dict:
-    return {k: entry[k] for k in
-            ("light_accent", "light_accent_strong", "dark_accent", "dark_accent_strong")}
 
 
 def _resolve(theme: str) -> tuple[str, dict]:
@@ -135,8 +133,8 @@ def render_preview(theme: str, mode: str | None, paper: str = "a4") -> str:
         context,
         sheet_id,
         style=entry["base"],
-        initial_theme=mode,
-        theme_palette=_palette(entry),
+        initial_theme=mode or entry.get("default_mode"),
+        theme_palette=gen.build_theme_palette(entry),
         palette_decoration=entry.get("decoration"),
         include_footer=True,
         paper=paper,
@@ -553,7 +551,7 @@ _PAGE = r"""<!doctype html>
   }
   .theme-row:hover { background: #fff; }
   .theme-row.selected { background: #fff; border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
-  .theme-row .sw { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 auto;
+  .theme-row .sw { width: 16px; height: 16px; border-radius: 4px; flex: 0 0 auto;
                    border: 1px solid rgba(0,0,0,.15); }
   .theme-row .nm { font-size: 13px; }
 
@@ -698,7 +696,9 @@ function buildThemeList() {
     row.dataset.theme = t.name;
     const sw = document.createElement("span");
     sw.className = "sw";
-    sw.style.background = t.light_accent;
+    // Diagonal split: the theme's light-mode paper + accent, then its dark-mode pair.
+    sw.style.background = `linear-gradient(135deg, ${t.light_paper} 0 30%, ${t.light_accent} 30% 50%, `
+                        + `${t.dark_accent} 50% 70%, ${t.dark_paper} 70% 100%)`;
     const nm = document.createElement("span");
     nm.className = "nm";
     nm.textContent = t.name;

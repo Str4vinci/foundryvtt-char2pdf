@@ -137,8 +137,7 @@ class AdapterContractTests(unittest.TestCase):
         adapter = gen.DND5E_ADAPTER
         context = adapter.build_context(MINIMAL_ACTOR)
         entry = gen.THEMES["ledger"]
-        palette = {k: entry[k] for k in
-                   ("light_accent", "light_accent_strong", "dark_accent", "dark_accent_strong")}
+        palette = gen.build_theme_palette(entry)
         via_adapter = adapter.render(
             context, "sheet", style=entry["base"], initial_theme=None,
             theme_palette=palette, palette_decoration=entry.get("decoration"),

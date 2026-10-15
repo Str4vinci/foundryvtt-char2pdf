@@ -66,7 +66,7 @@ class SystemAdapter(Protocol):
         *,
         style: str,
         initial_theme: str | None,
-        theme_palette: dict[str, str] | None,
+        theme_palette: dict[str, dict[str, str]] | None,
         palette_decoration: str | None,
         include_footer: bool,
         paper: str,

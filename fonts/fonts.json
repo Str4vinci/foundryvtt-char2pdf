@@ -1,0 +1,417 @@
+{
+  "Source Serif 4": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "source-serif-4-200-900-normal.woff2",
+        "style": "normal",
+        "weight": "200 900"
+      },
+      {
+        "file": "source-serif-4-200-900-italic.woff2",
+        "style": "italic",
+        "weight": "200 900"
+      }
+    ]
+  },
+  "Inter": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "inter-100-900-normal.woff2",
+        "style": "normal",
+        "weight": "100 900"
+      }
+    ]
+  },
+  "IBM Plex Mono": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "ibm-plex-mono-400-normal.woff2",
+        "style": "normal",
+        "weight": "400"
+      },
+      {
+        "file": "ibm-plex-mono-700-normal.woff2",
+        "style": "normal",
+        "weight": "700"
+      }
+    ]
+  },
+  "EB Garamond": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "eb-garamond-400-800-normal.woff2",
+        "style": "normal",
+        "weight": "400 800"
+      },
+      {
+        "file": "eb-garamond-400-800-italic.woff2",
+        "style": "italic",
+        "weight": "400 800"
+      }
+    ]
+  },
+  "Playfair Display": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "playfair-display-400-900-normal.woff2",
+        "style": "normal",
+        "weight": "400 900"
+      }
+    ]
+  },
+  "Source Sans 3": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "source-sans-3-200-900-normal.woff2",
+        "style": "normal",
+        "weight": "200 900"
+      }
+    ]
+  },
+  "Cormorant Garamond": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "cormorant-garamond-300-700-normal.woff2",
+        "style": "normal",
+        "weight": "300 700"
+      },
+      {
+        "file": "cormorant-garamond-300-700-italic.woff2",
+        "style": "italic",
+        "weight": "300 700"
+      }
+    ]
+  },
+  "Cinzel": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "cinzel-400-900-normal.woff2",
+        "style": "normal",
+        "weight": "400 900"
+      }
+    ]
+  },
+  "Literata": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "literata-200-900-normal.woff2",
+        "style": "normal",
+        "weight": "200 900"
+      },
+      {
+        "file": "literata-200-900-italic.woff2",
+        "style": "italic",
+        "weight": "200 900"
+      }
+    ]
+  },
+  "Space Grotesk": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "space-grotesk-300-700-normal.woff2",
+        "style": "normal",
+        "weight": "300 700"
+      }
+    ]
+  },
+  "IBM Plex Sans": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "ibm-plex-sans-100-700-normal.woff2",
+        "style": "normal",
+        "weight": "100 700"
+      }
+    ]
+  },
+  "Fraunces": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "fraunces-100-900-normal.woff2",
+        "style": "normal",
+        "weight": "100 900"
+      },
+      {
+        "file": "fraunces-100-900-italic.woff2",
+        "style": "italic",
+        "weight": "100 900"
+      }
+    ]
+  },
+  "Sora": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "sora-100-800-normal.woff2",
+        "style": "normal",
+        "weight": "100 800"
+      }
+    ]
+  },
+  "IBM Plex Sans Condensed": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "ibm-plex-sans-condensed-400-normal.woff2",
+        "style": "normal",
+        "weight": "400"
+      },
+      {
+        "file": "ibm-plex-sans-condensed-700-normal.woff2",
+        "style": "normal",
+        "weight": "700"
+      }
+    ]
+  },
+  "Bitter": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "bitter-100-900-normal.woff2",
+        "style": "normal",
+        "weight": "100 900"
+      },
+      {
+        "file": "bitter-100-900-italic.woff2",
+        "style": "italic",
+        "weight": "100 900"
+      }
+    ]
+  },
+  "Quicksand": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "quicksand-300-700-normal.woff2",
+        "style": "normal",
+        "weight": "300 700"
+      }
+    ]
+  },
+  "Mulish": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "mulish-200-900-normal.woff2",
+        "style": "normal",
+        "weight": "200 900"
+      }
+    ]
+  },
+  "Zilla Slab": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "zilla-slab-400-normal.woff2",
+        "style": "normal",
+        "weight": "400"
+      },
+      {
+        "file": "zilla-slab-700-normal.woff2",
+        "style": "normal",
+        "weight": "700"
+      },
+      {
+        "file": "zilla-slab-400-italic.woff2",
+        "style": "italic",
+        "weight": "400"
+      },
+      {
+        "file": "zilla-slab-700-italic.woff2",
+        "style": "italic",
+        "weight": "700"
+      }
+    ]
+  },
+  "Work Sans": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "work-sans-100-900-normal.woff2",
+        "style": "normal",
+        "weight": "100 900"
+      }
+    ]
+  },
+  "Spectral": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "spectral-400-normal.woff2",
+        "style": "normal",
+        "weight": "400"
+      },
+      {
+        "file": "spectral-700-normal.woff2",
+        "style": "normal",
+        "weight": "700"
+      },
+      {
+        "file": "spectral-400-italic.woff2",
+        "style": "italic",
+        "weight": "400"
+      },
+      {
+        "file": "spectral-700-italic.woff2",
+        "style": "italic",
+        "weight": "700"
+      }
+    ]
+  },
+  "Chakra Petch": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "chakra-petch-400-normal.woff2",
+        "style": "normal",
+        "weight": "400"
+      },
+      {
+        "file": "chakra-petch-700-normal.woff2",
+        "style": "normal",
+        "weight": "700"
+      }
+    ]
+  },
+  "Newsreader": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "newsreader-200-800-normal.woff2",
+        "style": "normal",
+        "weight": "200 800"
+      },
+      {
+        "file": "newsreader-200-800-italic.woff2",
+        "style": "italic",
+        "weight": "200 800"
+      }
+    ]
+  },
+  "Manrope": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "manrope-200-800-normal.woff2",
+        "style": "normal",
+        "weight": "200 800"
+      }
+    ]
+  },
+  "Marcellus": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "marcellus-400-normal.woff2",
+        "style": "normal",
+        "weight": "400"
+      }
+    ]
+  },
+  "Jost": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "jost-100-900-normal.woff2",
+        "style": "normal",
+        "weight": "100 900"
+      }
+    ]
+  },
+  "Shippori Mincho": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "shippori-mincho-400-normal.woff2",
+        "style": "normal",
+        "weight": "400"
+      },
+      {
+        "file": "shippori-mincho-700-normal.woff2",
+        "style": "normal",
+        "weight": "700"
+      }
+    ]
+  },
+  "Zen Old Mincho": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "zen-old-mincho-400-normal.woff2",
+        "style": "normal",
+        "weight": "400"
+      },
+      {
+        "file": "zen-old-mincho-700-normal.woff2",
+        "style": "normal",
+        "weight": "700"
+      }
+    ]
+  },
+  "Zen Kaku Gothic New": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "zen-kaku-gothic-new-400-normal.woff2",
+        "style": "normal",
+        "weight": "400"
+      },
+      {
+        "file": "zen-kaku-gothic-new-700-normal.woff2",
+        "style": "normal",
+        "weight": "700"
+      }
+    ]
+  },
+  "Rubik": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "rubik-300-900-normal.woff2",
+        "style": "normal",
+        "weight": "300 900"
+      }
+    ]
+  },
+  "Roboto Slab": {
+    "license": "Apache-2.0",
+    "faces": [
+      {
+        "file": "roboto-slab-100-900-normal.woff2",
+        "style": "normal",
+        "weight": "100 900"
+      }
+    ]
+  },
+  "Roboto Condensed": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "roboto-condensed-100-900-normal.woff2",
+        "style": "normal",
+        "weight": "100 900"
+      }
+    ]
+  },
+  "Roboto": {
+    "license": "OFL-1.1",
+    "faces": [
+      {
+        "file": "roboto-100-900-normal.woff2",
+        "style": "normal",
+        "weight": "100 900"
+      }
+    ]
+  }
+}

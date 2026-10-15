@@ -16,6 +16,43 @@ this file.
 
 ## [Unreleased]
 
+### Themes
+
+- Every theme now recolors the whole sheet, not just the accent: each one
+  defines its own paper, panel, ink, and rule colors for light and dark mode.
+  Curated palettes use the scheme's official colors (Dracula's `#282a36`,
+  Nord's Polar Night, Solarized's base tones, …), and class themes tint their
+  surfaces toward the class color.
+- Contrast guardrails: accents and secondary text are darkened or lightened
+  (hue and saturation kept) until they meet WCAG AA on every surface. In light
+  mode, 18 themes previously had accent text below 4.5:1, including the
+  `cleric` theme shown in the README (2.6:1).
+- Text on accent-filled buttons and active tokens now picks a legible color
+  automatically. In dark mode it was forced to white, which failed on every
+  theme (as low as 1.5:1 on Gruvbox and Ayu).
+- Class emblems: every page header shows a small line-art symbol for the
+  character's primary class, drawn in the theme accent (new `emblems.py`;
+  homebrew or missing classes get a d20).
+- Light/dark twin themes are merged: `catppuccin` (Latte/Mocha), `rose-pine`
+  (Dawn/Main), `everforest`, `gruvbox`, and the new `ayu` (Light/Mirage).
+  The old names remain as aliases that also pick the matching color mode.
+- Secondary accents were re-picked so each pair sits together (for example
+  Dracula pink + purple instead of pink + cyan).
+- Palette decorations (glows, panel sheen) now follow the color mode instead
+  of only showing in light mode, and the per-palette CSS is generated from a
+  table instead of 18 hand-copied blocks.
+- Light-mode print/PDF uses plain white paper, and the panel sheen is not
+  printed.
+- The web UI theme swatches show both the light and the dark variant.
+- Theme typefaces are now bundled and embedded in every sheet (Latin-subset
+  WOFF2, OFL/Apache licensed, in `fonts/`). Before, the font stacks only named
+  fonts like Space Grotesk or Cinzel, so most machines showed generic system
+  fallbacks and themes looked alike. Each sheet inlines only its theme's
+  fonts (about 180–270 KB); nothing is fetched over the network.
+  `tools/fetch_fonts.py` rebuilds the set, and the Windows build bundles it.
+- Numbers use lining figures everywhere, so old-style fonts such as Cormorant
+  no longer draw stats like "900" small and below the baseline.
+
 ### Security
 
 - The local web UI now rejects requests whose `Host` header does not name the
